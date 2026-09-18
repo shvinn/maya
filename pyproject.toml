@@ -1,0 +1,25 @@
+[project]
+name = "maya"
+version = "0.1.0"
+description = "A fictional island's flight network, exposed as simulated APIs and MCP tools."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "mcp>=1.2.0",
+]
+
+[project.scripts]
+maya = "maya.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/maya"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
