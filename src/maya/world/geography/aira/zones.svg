@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 780" font-family="Helvetica, Arial, sans-serif">
+  <rect x="0" y="0" width="1000" height="780" fill="#ffffff"/>
+
+  <text x="500" y="34" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a">
+    Aira delivery zones — road graph
+  </text>
+
+  <!-- Road edges (drawn first, under the nodes) -->
+  <g stroke="#8a8a8a" stroke-width="2">
+    <line x1="500" y1="380" x2="500" y2="180"/> <!-- OLD-CAP -->
+    <line x1="500" y1="380" x2="700" y2="260"/> <!-- OLD-FIN -->
+    <line x1="500" y1="380" x2="740" y2="480"/> <!-- OLD-PRT -->
+    <line x1="500" y1="380" x2="180" y2="260"/> <!-- OLD-RIV -->
+    <line x1="500" y1="380" x2="330" y2="560"/> <!-- OLD-MKT -->
+    <line x1="500" y1="380" x2="880" y2="600"/> <!-- OLD-APT -->
+    <line x1="500" y1="380" x2="230" y2="460"/> <!-- OLD-CRN -->
+    <line x1="500" y1="180" x2="700" y2="260"/> <!-- CAP-FIN -->
+    <line x1="500" y1="180" x2="620" y2="150"/> <!-- CAP-EMB -->
+  </g>
+
+  <!-- Edge minute labels -->
+  <g font-size="13" fill="#b02a37" font-weight="bold">
+    <text x="512" y="284">8</text>   <!-- OLD-CAP -->
+    <text x="608" y="312">10</text>  <!-- OLD-FIN -->
+    <text x="624" y="419">9</text>   <!-- OLD-PRT -->
+    <text x="330" y="309">19</text>  <!-- OLD-RIV -->
+    <text x="392" y="464">6</text>   <!-- OLD-MKT -->
+    <text x="694" y="479">24</text>  <!-- OLD-APT -->
+    <text x="358" y="409">7</text>   <!-- OLD-CRN -->
+    <text x="596" y="209">12</text>  <!-- CAP-FIN -->
+    <text x="575" y="155">7</text>   <!-- CAP-EMB -->
+  </g>
+
+  <!-- Self-edges (small loops), each pushed out on whichever side has no
+       road edge attached to that zone, and labels pushed out further still,
+       so neither touches the zone circle, the road lines, or the name text. -->
+  <g fill="none" stroke="#2a6f97" stroke-width="1.5">
+    <circle cx="543" cy="380" r="13"/> <!-- OLD self, east -->
+    <circle cx="457" cy="180" r="13"/> <!-- CAP self, west -->
+    <circle cx="743" cy="260" r="13"/> <!-- FIN self, east -->
+    <circle cx="783" cy="480" r="13"/> <!-- PRT self, east -->
+    <circle cx="180" cy="217" r="13"/> <!-- RIV self, north -->
+    <circle cx="287" cy="560" r="13"/> <!-- MKT self, west -->
+    <circle cx="620" cy="107" r="13"/> <!-- EMB self, north -->
+    <circle cx="187" cy="460" r="13"/> <!-- CRN self, west -->
+    <circle cx="923" cy="600" r="13"/> <!-- APT self, east -->
+  </g>
+  <g font-size="11" fill="#2a6f97" font-weight="bold">
+    <text x="561" y="384" text-anchor="start">8</text>  <!-- OLD self=8 -->
+    <text x="439" y="184" text-anchor="end">5</text>    <!-- CAP self=5 -->
+    <text x="761" y="264" text-anchor="start">7</text>  <!-- FIN self=7 -->
+    <text x="801" y="484" text-anchor="start">6</text>  <!-- PRT self=6 -->
+    <text x="180" y="197" text-anchor="middle">9</text> <!-- RIV self=9 -->
+    <text x="269" y="564" text-anchor="end">9</text>    <!-- MKT self=9 -->
+    <text x="620" y="87" text-anchor="middle">6</text>  <!-- EMB self=6 -->
+    <text x="169" y="464" text-anchor="end">8</text>    <!-- CRN self=8 -->
+    <text x="941" y="604" text-anchor="start">7</text>  <!-- APT self=7 -->
+  </g>
+
+  <!-- Nodes: all the same style — every zone is just a zone, Old Aira just
+       happens to be where most roads meet. -->
+  <g fill="#cfe3ff" stroke="#2a4d8f" stroke-width="2">
+    <circle cx="500" cy="380" r="20"/> <!-- Old Aira -->
+    <circle cx="500" cy="180" r="20"/> <!-- Capitol Hill -->
+    <circle cx="740" cy="480" r="20"/> <!-- Portside -->
+    <circle cx="700" cy="260" r="20"/> <!-- Finance Quarter -->
+    <circle cx="330" cy="560" r="20"/> <!-- Lantern Market -->
+    <circle cx="620" cy="150" r="20"/> <!-- Embassy Row -->
+    <circle cx="180" cy="260" r="20"/> <!-- Riverside Heights -->
+    <circle cx="230" cy="460" r="20"/> <!-- Carnival Row -->
+    <circle cx="880" cy="600" r="20"/> <!-- Skyview -->
+  </g>
+  <g font-size="12" font-weight="bold" fill="#1a2e5c" text-anchor="middle">
+    <text x="500" y="384">OLD</text>
+    <text x="500" y="184">CAP</text>
+    <text x="740" y="484">PRT</text>
+    <text x="700" y="264">FIN</text>
+    <text x="330" y="564">MKT</text>
+    <text x="620" y="154">EMB</text>
+    <text x="180" y="264">RIV</text>
+    <text x="230" y="464">CRN</text>
+    <text x="880" y="604">APT</text>
+  </g>
+
+  <!-- Zone names, always below the node so they never fight the self-loop
+       (which is placed to whichever side is otherwise free of roads). -->
+  <g font-size="11" fill="#1a1a1a" text-anchor="middle">
+    <text x="500" y="416">Old Aira · 101</text>
+    <text x="500" y="216">Capitol Hill · 102</text>
+    <text x="740" y="516">Portside · 103</text>
+    <text x="700" y="296">Finance Quarter · 104</text>
+    <text x="330" y="596">Lantern Market · 105</text>
+    <text x="620" y="186">Embassy Row · 106</text>
+    <text x="180" y="296">Riverside Heights · 107</text>
+    <text x="230" y="496">Carnival Row · 108</text>
+    <text x="880" y="636">Skyview · 109</text>
+  </g>
+
+  <!-- Legend -->
+  <g font-size="11" fill="#333333">
+    <circle cx="60" cy="740" r="6" fill="#cfe3ff" stroke="#2a4d8f"/>
+    <text x="74" y="744">Zone</text>
+    <line x1="150" y1="740" x2="180" y2="740" stroke="#8a8a8a" stroke-width="2"/>
+    <text x="188" y="744">Road (minutes)</text>
+    <circle cx="350" cy="740" r="8" fill="none" stroke="#2a6f97" stroke-width="1.5"/>
+    <text x="365" y="744">Self-edge (intra-zone minutes)</text>
+  </g>
+</svg>
