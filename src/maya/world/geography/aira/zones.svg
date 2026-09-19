@@ -2,7 +2,7 @@
   <rect x="0" y="0" width="1000" height="780" fill="#ffffff"/>
 
   <text x="500" y="34" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a1a">
-    Aira delivery zones — road graph
+    Aira zones — road graph
   </text>
 
   <!-- Road edges (drawn first, under the nodes) -->

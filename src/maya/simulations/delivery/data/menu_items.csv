@@ -1,0 +1,135 @@
+item_id,vendor,name,category,price,diet
+OQN-01,OQN,Brothless Ash Noodles,main,14,vegan
+OQN-02,OQN,Cental Broth Noodles,main,16,non_veg
+OQN-03,OQN,Pickled Radish,side,4,vegan
+OQN-04,OQN,Iced Barley Tea,drink,3,vegan
+OQN-05,OQN,Red Bean Sesame Balls,dessert,6,vegan
+OQN-06,OQN,Char Siu Pork Bites,side,6,non_veg
+LTH-01,LTH,Sencha Green Tea,drink,5,vegan
+LTH-02,LTH,Matcha Milk Tea,drink,6,vegetarian
+LTH-03,LTH,Steamed Pork Buns,main,9,non_veg
+LTH-04,LTH,Sesame Rice Crackers,side,4,vegan
+LTH-05,LTH,Vegetable Gyoza,main,9,vegan
+LTH-06,LTH,Mochi Ice Cream,dessert,6,vegetarian
+LTH-07,LTH,Chicken Karaage Bites,side,6,non_veg
+CBS-01,CBS,Cured Ham & Cheese Sandwich,main,11,non_veg
+CBS-02,CBS,Roast Vegetable Sandwich,main,10,vegan
+CBS-03,CBS,Almond Biscotti,dessert,5,vegetarian
+CBS-04,CBS,Espresso,drink,4,vegan
+CBS-05,CBS,Prosciutto Bites,side,7,non_veg
+CBS-06,CBS,Caprese Skewers,side,6,vegetarian
+HBC-01,HBC,Grilled Reef Snapper,main,28,non_veg
+HBC-02,HBC,Charred Squid Skewer,main,22,non_veg
+HBC-03,HBC,Olive & Herb Salad,side,6,vegan
+HBC-04,HBC,Citrus Cooler,drink,5,vegan
+HBC-05,HBC,Salted Caramel Tart,dessert,8,vegetarian
+HBC-06,HBC,Grilled Halloumi & Vegetable Skewer,main,19,vegetarian
+HBC-07,HBC,Grilled Chorizo Skewer,side,7,non_veg
+DKF-01,DKF,Classic Fish & Chips,main,15,non_veg
+DKF-02,DKF,Battered Prawns,main,17,non_veg
+DKF-03,DKF,Mushy Peas,side,3,vegan
+DKF-04,DKF,Malt Vinegar Soda,drink,3,vegan
+DKF-05,DKF,Battered Halloumi & Chips,main,13,vegetarian
+DKF-06,DKF,Battered Sausage,side,5,non_veg
+QBB-01,QBB,Charred Chicken Grain Bowl,main,13,non_veg
+QBB-02,QBB,Seared Tofu Grain Bowl,main,12,vegan
+QBB-03,QBB,Charred Salsa Side Cup,side,2,vegan
+QBB-04,QBB,Cold Brew,drink,4,vegan
+QBB-05,QBB,Cinnamon Sugar Churro Bites,dessert,5,vegetarian
+QBB-06,QBB,Chorizo Crumble Cup,side,4,non_veg
+LDG-01,LDG,Peppercorn Sirloin,main,26,non_veg
+LDG-02,LDG,Grilled Chicken Plate,main,16,non_veg
+LDG-03,LDG,Charred Corn,side,5,vegan
+LDG-04,LDG,House Spiced Cordial,drink,6,vegan
+LDG-05,LDG,Flourless Chocolate Cake,dessert,9,vegetarian
+LDG-06,LDG,Grilled Portobello Steak,main,15,vegan
+LDG-07,LDG,Bacon-Wrapped Asparagus,side,7,non_veg
+MKS-01,MKS,Charcoal Lamb Skewer,main,10,non_veg
+MKS-02,MKS,Chicken Skewer,main,8,non_veg
+MKS-03,MKS,Grilled Corn Skewer,side,4,vegan
+MKS-04,MKS,Sugarcane Juice,drink,3,vegan
+MKS-05,MKS,Grilled Tofu Satay Skewer,main,7,vegan
+MKS-06,MKS,Pork Belly Bites,side,6,non_veg
+SRC-01,SRC,Coconut Fish Curry,main,17,non_veg
+SRC-02,SRC,Lentil Curry,main,12,vegan
+SRC-03,SRC,Saffron Rice,side,5,vegan
+SRC-04,SRC,Mango Lassi,drink,5,vegetarian
+SRC-05,SRC,Gulab Jamun,dessert,6,vegetarian
+SRC-06,SRC,Tandoori Chicken Bites,side,6,non_veg
+GDS-01,GDS,Pork & Chive Dumplings,main,9,non_veg
+GDS-02,GDS,Vegetable Dumplings,main,8,vegan
+GDS-03,GDS,Chili Oil Side Cup,side,2,vegan
+GDS-04,GDS,Hot Soy Milk,drink,3,vegan
+GDS-05,GDS,Sesame Seed Balls,dessert,5,vegan
+GDS-06,GDS,Char Siu Bao Bites,side,5,non_veg
+NIT-01,NIT,Smoked Whitefish Plate,main,24,non_veg
+NIT-02,NIT,Cloudberry Compote Cake,dessert,10,vegetarian
+NIT-03,NIT,Rye Flatbread,side,5,vegan
+NIT-04,NIT,Juniper Cordial,drink,6,vegan
+NIT-05,NIT,Roasted Root Vegetable Plate,main,18,vegan
+NIT-06,NIT,Smoked Salmon Bites,side,8,non_veg
+CSK-01,CSK,Braised Short Rib Fusion Plate,main,22,non_veg
+CSK-02,CSK,Herb Dumpling Soup,main,14,vegetarian
+CSK-03,CSK,Pickled Vegetable Side,side,4,vegan
+CSK-04,CSK,Ginger Fizz,drink,4,vegan
+CSK-05,CSK,Honey Walnut Cake,dessert,7,vegetarian
+CSK-06,CSK,Beef Skewer Bites,side,7,non_veg
+RHK-01,RHK,Slow Braised Stew,main,15,non_veg
+RHK-02,RHK,Roast Chicken Plate,main,16,non_veg
+RHK-03,RHK,Mashed Root Vegetables,side,5,vegetarian
+RHK-04,RHK,Homemade Lemonade,drink,3,vegan
+RHK-05,RHK,Vegetable & Barley Stew,main,13,vegan
+RHK-06,RHK,Apple Crumble,dessert,7,vegetarian
+RHK-07,RHK,Pulled Pork Side Cup,side,6,non_veg
+AHG-01,AHG,Midnight Burger,main,14,non_veg
+AHG-02,AHG,Spiced Wings,main,12,non_veg
+AHG-03,AHG,Loaded Fries,side,8,vegetarian
+AHG-04,AHG,Ginger Beer,drink,4,vegan
+AHG-05,AHG,Grilled Veggie Burger,main,13,vegetarian
+AHG-06,AHG,Bacon Jalapeno Poppers,side,7,non_veg
+SGG-01,SGG,Turkey Club Sandwich,main,10,non_veg
+SGG-02,SGG,Egg & Cress Sandwich,main,8,vegetarian
+SGG-03,SGG,Protein Snack Box,side,6,vegetarian
+SGG-04,SGG,Bottled Iced Tea,drink,3,vegan
+SGG-05,SGG,Chocolate Chip Cookie,dessert,4,vegetarian
+SGG-06,SGG,Turkey Bacon Strips,side,4,non_veg
+GWE-01,GWE,Wok-Fried Noodles,main,12,non_veg
+GWE-02,GWE,Vegetarian Mapo Tofu,main,13,vegan
+GWE-03,GWE,Spring Rolls,side,6,vegan
+GWE-04,GWE,Jasmine Tea,drink,3,vegan
+GWE-05,GWE,Five-Spice Pork Bites,side,6,non_veg
+TDA-01,TDA,Butter Chicken,main,16,non_veg
+TDA-02,TDA,Chana Masala,main,11,vegan
+TDA-03,TDA,Garlic Naan,side,4,vegetarian
+TDA-04,TDA,Masala Chai,drink,3,vegetarian
+TDA-05,TDA,Kheer Rice Pudding,dessert,6,vegetarian
+TDA-06,TDA,Chicken Tikka Bites,side,6,non_veg
+SGS-01,SGS,Beef Pho,main,15,non_veg
+SGS-02,SGS,Grilled Pork Banh Mi,main,12,non_veg
+SGS-03,SGS,Vegetable Spring Rolls,side,6,vegan
+SGS-04,SGS,Iced Vietnamese Coffee,drink,4,vegetarian
+SGS-05,SGS,Tofu & Herb Vermicelli Bowl,main,12,vegan
+SGS-06,SGS,Coconut Pandan Jelly,dessert,5,vegan
+SGS-07,SGS,Grilled Pork Skewer,side,6,non_veg
+CAN-01,CAN,Slow-Braised Barbacoa Tacos,main,18,non_veg
+CAN-02,CAN,Black Bean & Avocado Bowl,main,14,vegan
+CAN-03,CAN,Roasted Corn Elote,side,6,vegetarian
+CAN-04,CAN,Hibiscus Agua Fresca,drink,5,vegan
+CAN-05,CAN,Churros with Chocolate,dessert,8,vegetarian
+CAN-06,CAN,Chorizo Queso Dip,side,6,non_veg
+FBP-01,FBP,Pepperoni Pizza,main,16,non_veg
+FBP-02,FBP,Margherita Pizza,main,13,vegetarian
+FBP-03,FBP,Vegan Garden Pizza,main,14,vegan
+FBP-04,FBP,Garlic Breadsticks,side,5,vegetarian
+FBP-05,FBP,Buffalo Wings,side,7,non_veg
+FBP-06,FBP,Cola,drink,3,vegan
+FBP-07,FBP,Cinnamon Knots,dessert,6,vegetarian
+VNT-01,VNT,Spaghetti & Meatballs,main,15,non_veg
+VNT-02,VNT,Penne Alfredo,main,13,vegetarian
+VNT-03,VNT,Vegan Marinara Penne,main,13,vegan
+VNT-04,VNT,Garden Salad,side,5,vegan
+VNT-05,VNT,Italian Sausage Skewer,side,7,non_veg
+VNT-06,VNT,Warm Breadsticks,side,4,vegetarian
+VNT-07,VNT,Sparkling Lemonade,drink,3,vegan
+VNT-08,VNT,Tiramisu,dessert,7,vegetarian
+

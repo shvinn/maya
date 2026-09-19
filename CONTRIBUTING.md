@@ -8,12 +8,16 @@ and the house style both follow.
 
 Standard `src/` layout: `src/maya/` is the one installable package.
 
-- `src/maya/simulations/flights/` is the domain logic: `airports.py`,
-  `schedule.py`, `search.py`, `bookings.py`, and the shared SQLite connection
-  in `db.py`. No adapter code lives in here.
-- `src/maya/cli.py` and `src/maya/mcp_tools.py` are the adapter layer -- the
-  `maya` command and the actual `flights_*` MCP tool registrations. They call
-  straight into `simulations/flights/`; no business logic lives in them.
+- `src/maya/simulations/<domain>/` (`flights/`, `delivery/`) is the domain
+  logic — reference data access, booking/ordering rules, and the shared
+  SQLite connection in that domain's own `db.py` — plus that domain's own
+  `mcp_tools.py`, which is the thin `<domain>_*` MCP tool adapter for it.
+  No business logic lives in a domain's `mcp_tools.py`; it calls straight
+  into the rest of its own package.
+- `src/maya/cli.py` is the `maya` command; `src/maya/mcp_tools.py` combines
+  every domain's `MCPServer` (from each `simulations/<domain>/mcp_tools.py`)
+  into one registry that `cli.py` dispatches by name. Neither defines any
+  tools itself.
 - Reference data (airports, airlines, aircraft, the weekly schedule) lives in
   `src/maya/simulations/flights/data/*.csv` — human-editable, reloaded into
   SQLite on every start. Edit a row there and the world changes; no code
