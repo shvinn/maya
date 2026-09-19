@@ -1,0 +1,22 @@
+code,name,zone,cuisine,style,prep_minutes,delivery_fee
+OQN,Old Quarter Noodle House,AIR-OLD,Chinese,home_kitchen,22,2
+LTH,The Lantern Teahouse,AIR-OLD,Japanese,chain,12,3
+CBS,Capitol Bakery & Sandwiches,AIR-CAP,Italian,chain,10,3
+HBC,Harbor Catch,AIR-PRT,Mediterranean,bistro,25,5
+DKF,Dockside Fry,AIR-PRT,Fried fish & chips,ghost_kitchen,6,2
+QBB,QuickBite Bowls,AIR-FIN,Mexican,ghost_kitchen,5,2
+LDG,The Ledger Grill,AIR-FIN,Grilled/steak,chain,15,4
+MKS,Market Skewers,AIR-MKT,Thai,home_kitchen,18,2
+SRC,Spice Route Curry House,AIR-MKT,Indian,chain,14,3
+GDS,Golden Dumpling Stall,AIR-MKT,Dumplings,home_kitchen,20,2
+NIT,Northern Isles Table,AIR-EMB,Outer-isles cuisine,bistro,26,5
+CSK,Cross-Strait Kitchen,AIR-EMB,Border-country fusion,chain,16,4
+RHK,Riverside Home Kitchen,AIR-RIV,Home-style comfort food,home_kitchen,24,2
+AHG,Afterhours Grill,AIR-CRN,Late-night bar food,ghost_kitchen,7,3
+SGG,Skyview Grab & Go,AIR-APT,Sandwiches/grab-and-go,chain,9,3
+GWE,Golden Wok Express,AIR-OLD,Chinese,ghost_kitchen,6,2
+TDA,Tandoor Alley,AIR-MKT,Indian,home_kitchen,21,2
+SGS,Saigon Streetside,AIR-MKT,Vietnamese,chain,13,3
+CAN,Casa Ánimo,AIR-FIN,Mexican,bistro,23,5
+FBP,Firebrick Pizzeria,AIR-RIV,Pizza,chain,16,3
+VNT,Vinewood Trattoria,AIR-CAP,Pasta,chain,18,4
