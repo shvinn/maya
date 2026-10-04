@@ -20,6 +20,30 @@ jobs:
 
       - uses: docker/setup-buildx-action@v3
 
+      # Smoke test first, on a native amd64 build loaded into the runner:
+      # start the container and check every domain answers. Nothing is
+      # published unless this passes.
+      - name: Build image for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: maya:smoke
+          cache-from: type=gha
+
+      - name: Smoke test
+        run: |
+          docker network create smoke
+          docker run -d --name maya --network smoke maya:smoke
+          docker run --rm --network smoke \
+            -v "$PWD/.github/scripts:/smoke:ro" \
+            --entrypoint python maya:smoke \
+            /smoke/docker_smoke_test.py http://maya:6292
+
+      - name: Container logs
+        if: failure()
+        run: docker logs maya || true
+
       - name: Log in to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
