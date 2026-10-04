@@ -19,7 +19,7 @@ from datetime import date as Date
 
 from mcp.server.mcpserver import MCPServer
 
-from . import airports, bookings, schedule, search
+from . import airports, bookings, connections, schedule, search
 
 mcp = MCPServer("maya-flights")
 
@@ -58,19 +58,27 @@ def flights_search_flights(
     passengers: int = 1,
     max_price: float | None = None,
     airline: str | None = None,
+    max_stops: int = 1,
     sort: str = "price",
     limit: int = 10,
 ) -> dict:
-    """Find bookable direct flights between two airports on one date.
+    """Find bookable flights between two airports on one date: direct
+    flights and one-stop connections.
 
     ``origin``/``destination`` accept an airport code or a city name.
-    ``departure_date`` is ``YYYY-MM-DD``. All flights are direct -- there is
-    no connection-building, so a missing city pair means there is no
-    service, not a itinerary to build. Seats and prices are computed live
-    from how close to departure it is and how full the flight already is,
-    so a search minutes apart can return different numbers. An empty result
-    is normal, not an error -- thin routes and peak dates genuinely sell out.
-    ``sort`` is one of "price", "duration", "departure".
+    ``departure_date`` is ``YYYY-MM-DD`` (the first flight's date). Each
+    option has ``stops`` (0 or 1) and a ``legs`` list. Connections with
+    ``overnight: true`` land in the evening and continue next morning -- the
+    traveller needs somewhere to sleep at the connection airport, which the
+    ticket doesn't include. Never more than one stop -- if a city pair has
+    neither, there is no service. ``max_stops=0`` returns direct flights
+    only. ``airline`` keeps options where every leg is that airline. Seats
+    and prices are computed live, so a search minutes apart can return
+    different numbers. A connection on one airline costs 20% less than its
+    legs bought separately (``connection_discount_per_passenger``); across
+    two airlines it's the plain sum. Its ``seats_available`` is the fuller
+    leg's. An empty result is normal, not an error. ``sort`` is one of
+    "price", "duration", "departure".
     """
     try:
         day = Date.fromisoformat(departure_date)
@@ -84,6 +92,7 @@ def flights_search_flights(
             passengers=passengers,
             max_price=max_price,
             airline=airline,
+            max_stops=max_stops,
             sort=sort,
             limit=limit,
         )
@@ -99,25 +108,49 @@ def flights_book_flight(
     date: str,
     passenger_names: list[str],
     contact_email: str,
+    connecting_flight_number: str | None = None,
+    connecting_date: str | None = None,
 ) -> dict:
-    """Book a flight found via flights_search_flights.
+    """Book a flight found via flights_search_flights -- direct, or a
+    one-stop connection as one booking.
 
     Confirms immediately: there is no separate hold-then-pay step. ``date``
     is ``YYYY-MM-DD`` and must be a date the flight actually operates on.
+    For a connection, pass the option's first leg as ``flight_number`` /
+    ``date`` and its second leg as ``connecting_flight_number`` /
+    ``connecting_date`` (defaults to ``date``; set it when the second leg
+    departs the next day). Both legs are booked together or not at all, and
+    fails with invalid_connection if the pair isn't a valid connection.
     """
+    legs = []
+    for number, day_text in (
+        (flight_number, date),
+        (connecting_flight_number, connecting_date or date),
+    ):
+        if number is None:
+            continue
+        try:
+            day = Date.fromisoformat(day_text)
+        except ValueError:
+            return _error("invalid_request", f"{day_text!r} is not a YYYY-MM-DD date.")
+        flight = schedule.find(number, day)
+        if flight is None:
+            return _error(
+                "not_found",
+                f"{number} does not operate on {day_text}.",
+                "Search again for a date this flight actually flies.",
+            )
+        legs.append(flight)
+    if len(legs) == 2:
+        problem = connections.problem(*legs)
+        if problem:
+            return _error(
+                "invalid_connection",
+                problem,
+                "Book a connection exactly as flights_search_flights returned it.",
+            )
     try:
-        day = Date.fromisoformat(date)
-    except ValueError:
-        return _error("invalid_request", f"{date!r} is not a YYYY-MM-DD date.")
-    flight = schedule.find(flight_number, day)
-    if flight is None:
-        return _error(
-            "not_found",
-            f"{flight_number} does not operate on {date}.",
-            "Search again for a date this flight actually flies.",
-        )
-    try:
-        return bookings.book(flight, passenger_names, contact_email)
+        return bookings.book(legs, passenger_names, contact_email)
     except bookings.BookingError as e:
         return _error(e.code, str(e), e.hint)
 
@@ -143,7 +176,8 @@ def flights_list_bookings(email: str | None = None, status: str | None = None) -
 
 @mcp.tool()
 def flights_cancel_booking(booking_reference: str) -> dict:
-    """Cancel a booking. Applies the fare's refund rule.
+    """Cancel a booking -- both legs together, for a connection. Applies the
+    fare's refund rule.
 
     Puffin Air fares can never be cancelled (fails with ``not_refundable``).
     Everyone else can cancel for a full refund any time up to 24 hours before
