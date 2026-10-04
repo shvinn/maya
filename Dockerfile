@@ -29,7 +29,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM python:3.13-slim-bookworm
 
 LABEL org.opencontainers.image.title="maya" \
-      org.opencontainers.image.description="A fictional island -- flights, hotels, car rental and food delivery -- exposed as MCP tools for AI agents." \
+      org.opencontainers.image.description="An API simulator for AI agents: a fictional world of everyday services -- flights, hotels, car rental and food delivery -- exposed as MCP tools." \
       org.opencontainers.image.source="https://github.com/shvinn/maya" \
       org.opencontainers.image.licenses="MIT"
 

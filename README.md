@@ -1,13 +1,15 @@
 <h1 align="center">Maya</h1>
 
 <p align="center">
-  <em>A fictional island, exposed as MCP tools —<br/>
-  so you can build and test AI agents without renting a real one.</em>
+  <em>An API simulator.<br/>
+  A SimCity.<br/>
+  The Matrix — for AI agents.</em>
 </p>
 
 ## Overview
 
-Maya is a simulated island nation for AI agents to act in, exposed as MCP
+Maya is an API simulator for AI agents: a fictional world of everyday
+services — flights, hotels, car rental and food delivery — exposed as MCP
 tools and running locally. Four domains exist today:
 
 - **Flights** — search, book, retrieve and cancel flights on a fictional
