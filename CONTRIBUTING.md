@@ -53,6 +53,18 @@ uv run maya serve        # MCP over HTTP on :6292
 docker build -t maya .   # the Docker image, as CI publishes it
 ```
 
+CI smoke-tests the image on every PR before anything is published: it starts
+the container and checks every domain's endpoint answers (see
+`.github/scripts/docker_smoke_test.py`). To run the same check locally:
+
+```bash
+docker network create smoke
+docker run -d --name maya --network smoke maya
+docker run --rm --network smoke -v "$PWD/.github/scripts:/smoke:ro" \
+  --entrypoint python maya /smoke/docker_smoke_test.py http://maya:6292
+docker rm -f maya && docker network rm smoke
+```
+
 Code style: standard library first, type hints throughout, docstrings that
 explain *why*. Comments earn their place by explaining a decision, not by
 narrating the next line.
