@@ -1,7 +1,7 @@
 # Contributing to Maya
 
 Maya is an API simulator for AI agents: a fictional world of everyday
-services — flights, hotels, car rental and food delivery — exposed as MCP
+services — flights, hotels, car rental, food delivery and events — exposed as MCP
 tools and running locally. This document is about contributing to that: the
 domain toolsets, the fictional world they run in, and the house style they
 all follow.
@@ -11,7 +11,7 @@ all follow.
 Standard `src/` layout: `src/maya/` is the one installable package.
 
 - `src/maya/simulations/<domain>/` (`flights/`, `delivery/`, `hotels/`,
-  `cars/`) is the domain logic — reference data access, booking/ordering rules, and the shared
+  `cars/`, `events/`) is the domain logic — reference data access, booking/ordering rules, and the shared
   SQLite connection in that domain's own `db.py` — plus that domain's own
   `mcp_tools.py`, which is the thin `<domain>_*` MCP tool adapter for it.
   No business logic lives in a domain's `mcp_tools.py`; it calls straight
@@ -23,7 +23,7 @@ Standard `src/` layout: `src/maya/` is the one installable package.
 - `src/maya/world/` is shared, domain-agnostic world data — today, Aira's
   zones and road graph, used by delivery and hotels.
 - Reference data (airports and the weekly schedule, vendors and menus,
-  hotels and room types, the rental fleet) lives in each domain's
+  hotels and room types, the rental fleet, venues and event series) lives in each domain's
   `data/*.csv` — human-editable, reloaded into SQLite on every start. Edit a
   row there and the world changes; no code change needed.
 - Bookings, orders and rentals — and the seats, rooms and cars they hold —
