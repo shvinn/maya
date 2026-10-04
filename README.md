@@ -75,6 +75,43 @@ Or as stdio servers, e.g. for Claude Desktop / Claude Code:
 
 MCP is the only interface today — no REST/OpenAPI yet.
 
+## Run with Docker
+
+No clone or Python needed. One image serves every domain:
+
+```bash
+docker run -p 127.0.0.1:6292:6292 -v maya-data:/data ghcr.io/shvinn/maya
+                                       # all domains, one path each:
+                                       #   http://localhost:6292/flights/mcp
+                                       #   http://localhost:6292/delivery/mcp
+                                       #   http://localhost:6292/hotels/mcp
+                                       #   http://localhost:6292/cars/mcp
+docker run -p 127.0.0.1:6292:6292 -v maya-data:/data ghcr.io/shvinn/maya serve --domain hotels
+docker compose up                      # same as the first, from a clone
+```
+
+Or as stdio servers for an MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "maya-flights": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "flights"]
+    }
+  }
+}
+```
+
+- Bookings, orders and rentals live in the `maya-data` volume, so they
+  survive restarts and are shared by every container using it. Remove the
+  volume (`docker volume rm maya-data`) for a fresh world.
+- Publish the port on `127.0.0.1` as above: the server has no
+  authentication.
+- Images are built for `linux/amd64` and `linux/arm64`, which covers Linux,
+  macOS (Intel and Apple Silicon) and Windows (x64 and ARM, via Docker
+  Desktop's default Linux containers).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).

@@ -23,7 +23,7 @@ SERVERS = {
 }
 
 
-def combined_app():
+def combined_app(host: str = "127.0.0.1"):
     """One Starlette app, one process, one port -- each domain still its own
     MCP endpoint at its own path (``/flights/mcp``, ``/delivery/mcp``,
     ``/hotels/mcp``, ``/cars/mcp``).
@@ -42,13 +42,19 @@ def combined_app():
     enters every domain's ``session_manager.run()`` itself; see that
     property's docstring in the ``mcp`` package, which calls this out by
     name as the supported way to host multiple ``MCPServer``\\ s together.
+
+    ``host`` is the address being bound, passed through so each domain's
+    DNS-rebinding protection matches it the way a single-domain ``run()``
+    does: on (localhost Host headers only) for a loopback bind, off for
+    0.0.0.0 -- otherwise a container reached as ``maya:6292`` would reject
+    every request.
     """
     from contextlib import AsyncExitStack, asynccontextmanager
 
     from starlette.applications import Starlette
     from starlette.routing import Mount
 
-    sub_apps = {name: server.streamable_http_app() for name, server in SERVERS.items()}
+    sub_apps = {name: server.streamable_http_app(host=host) for name, server in SERVERS.items()}
 
     @asynccontextmanager
     async def lifespan(app):

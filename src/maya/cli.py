@@ -19,6 +19,10 @@ Two ways to run an MCP server:
                                  mcp_tools.combined_app for what this is and
                                  is not.
 
+``serve`` binds 127.0.0.1 unless told otherwise (``--host``, or the
+``MAYA_HOST`` environment variable -- the Docker image sets it to 0.0.0.0 so
+the server is reachable from outside the container).
+
 There is no REST/OpenAPI surface yet -- only MCP is implemented. See
 DECISIONS.md and the README for what's real versus what's still aspirational.
 """
@@ -26,6 +30,7 @@ DECISIONS.md and the README for what's real versus what's still aspirational.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from .mcp_tools import SERVERS as _SERVERS
@@ -40,6 +45,7 @@ def main() -> None:
     # 6292 = MAYA on a phone keypad (M=6, A=2, Y=9, A=2) -- a memorable
     # default port, same spirit as 3000/8000/8080 for other frameworks.
     serve.add_argument("--port", type=int, default=6292)
+    serve.add_argument("--host", default=os.environ.get("MAYA_HOST", "127.0.0.1"))
     serve.add_argument("--domain", choices=[*_SERVERS, "all"], default="flights")
 
     mcp_cmd = sub.add_parser("mcp", help="Run an MCP server over stdio.")
@@ -51,9 +57,9 @@ def main() -> None:
         if args.domain == "all":
             import uvicorn
 
-            uvicorn.run(combined_app(), host="127.0.0.1", port=args.port)
+            uvicorn.run(combined_app(args.host), host=args.host, port=args.port)
         else:
-            _SERVERS[args.domain].run(transport="streamable-http", port=args.port)
+            _SERVERS[args.domain].run(transport="streamable-http", host=args.host, port=args.port)
     elif args.command == "mcp":
         _SERVERS[args.domain].run(transport="stdio")
     else:
