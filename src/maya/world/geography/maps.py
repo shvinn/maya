@@ -81,11 +81,21 @@ BY_CODE: dict[str, Zone] = {z.code: z for z in ZONES}
 
 def _shortest_paths() -> dict[tuple[str, str], int]:
     """All-pairs shortest minutes over the sparse road graph (Floyd-Warshall,
-    run once at import so distance_minutes() stays an O(1) lookup)."""
+    run once at import so distance_minutes() stays an O(1) lookup).
+
+    A zone's self-edge (getting around *within* the zone) is kept out of the
+    path search and applied afterwards: inside the search a zone must be 0
+    from itself, or every route through it would pick up that local travel
+    time -- and a self-edge folded in with ``min`` would simply lose to 0.
+    """
     codes = [z.code for z in ZONES]
     inf = float("inf")
     dist: dict[tuple[str, str], float] = {(a, b): (0 if a == b else inf) for a in codes for b in codes}
+    within_zone: dict[str, int] = {}
     for a, b, minutes in _load_edges():
+        if a == b:
+            within_zone[a] = minutes
+            continue
         dist[(a, b)] = min(dist[(a, b)], minutes)
         dist[(b, a)] = min(dist[(b, a)], minutes)
     for k in codes:
@@ -96,6 +106,8 @@ def _shortest_paths() -> dict[tuple[str, str], int]:
                 via_k = dist[(i, k)] + dist[(k, j)]
                 if via_k < dist[(i, j)]:
                     dist[(i, j)] = via_k
+    for code, minutes in within_zone.items():
+        dist[(code, code)] = minutes
     return {pair: int(minutes) for pair, minutes in dist.items() if minutes != inf}
 
 
