@@ -49,8 +49,6 @@ flowchart LR
         events["Events"]
     end
 
-    clock(["World clock · MYT · scalable"]) -.->|"now"| maya
-
     csv["World data (CSV)<br/>airports · vendors · hotels · fleet · shows"] -.->|"loaded on start"| maya
     maya <-->|"real state"| db[("maya.db<br/>bookings · orders · rentals · tickets")]
 ```
