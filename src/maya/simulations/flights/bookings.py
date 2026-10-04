@@ -40,6 +40,8 @@ import json
 import random
 from datetime import datetime, timedelta
 
+from maya.world import clock
+
 from . import db
 from .schedule import AIRCRAFT, AIRLINES, CURRENCY, ScheduledFlight
 
@@ -121,7 +123,7 @@ def _next_reference() -> str:
 
 def _background_sold(flight: ScheduledFlight) -> int:
     """Seats other travellers have taken, purely a function of time to departure."""
-    hours_left = (flight.departure - datetime.now()) / timedelta(hours=1)
+    hours_left = (flight.departure - clock.now()) / timedelta(hours=1)
     days_left = hours_left / 24
     pct_sold = max(0.0, min(1.0, 1 - days_left / BACKGROUND_DEMAND_HORIZON_DAYS))
     sold = round(flight.seats_total * pct_sold)
@@ -226,7 +228,7 @@ def book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email:
         **({"connection_discount_per_passenger": {"amount": discount, "currency": CURRENCY}} if discount else {}),
         "total_price": {"amount": fare * count, "currency": CURRENCY},
         "contact_email": contact_email,
-        "booked_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "booked_at": clock.now().strftime("%Y-%m-%d %H:%M"),
     }
     _save_booking(booking)
     return booking
@@ -262,7 +264,7 @@ def cancel(reference: str) -> dict:
             raise NotRefundable(policy_text(leg["airline"]))
 
     departure = datetime.strptime(booking["departure"], "%Y-%m-%d %H:%M")
-    hours_left = (departure - datetime.now()) / timedelta(hours=1)
+    hours_left = (departure - clock.now()) / timedelta(hours=1)
     if hours_left < REFUND_CUTOFF_HOURS:
         raise TooLateToCancel(
             f"Booking {booking['booking_reference']} departs in "

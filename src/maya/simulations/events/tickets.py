@@ -30,6 +30,7 @@ import json
 import random
 from datetime import date, datetime, timedelta
 
+from maya.world import clock
 from maya.world.geography import maps
 
 from . import catalog, db
@@ -122,7 +123,7 @@ def service_fee(face: int) -> int:
 
 def _background_sold(perf: Performance, section: Section) -> int:
     """Tickets other buyers have taken, purely a function of time to the start."""
-    days_left = (perf.start - datetime.now()) / timedelta(days=1)
+    days_left = (perf.start - clock.now()) / timedelta(days=1)
     ramp = max(0.0, min(1.0, 1 - days_left / BACKGROUND_DEMAND_HORIZON_DAYS))
     return min(section.capacity, round(section.capacity * perf.series.popularity * ramp))
 
@@ -212,7 +213,7 @@ def search(
         zone_code = found.code
     wanted_category = category.strip().lower() if category else None
     needle = (query or "").strip().lower()
-    now = datetime.now()
+    now = clock.now()
 
     rows = []
     day = start
@@ -246,7 +247,7 @@ def _status(booking: dict) -> str:
     value that's actually stored, as a terminal override."""
     if booking["cancelled"]:
         return "CANCELLED"
-    now = datetime.now()
+    now = clock.now()
     if now < datetime.fromisoformat(booking["start"]):
         return "CONFIRMED"
     if now < datetime.fromisoformat(booking["end"]):
@@ -279,7 +280,7 @@ def book(
     if section is None or section.venue != series.venue:
         raise SectionNotFound(f"{section_id!r} is not a section at {perf.venue.name}.")
 
-    now = datetime.now()
+    now = clock.now()
     if perf.date < now.date():
         raise InvalidDate(f"{perf.date.isoformat()} is in the past.")
     if perf.start <= now:
@@ -364,7 +365,7 @@ def cancel(reference: str) -> dict:
     series = catalog.get_series(booking["event_id"])
     if series is None or not series.refundable:
         raise NotRefundable(f"{booking['title']} tickets are non-refundable.")
-    hours_left = (datetime.fromisoformat(booking["start"]) - datetime.now()) / timedelta(hours=1)
+    hours_left = (datetime.fromisoformat(booking["start"]) - clock.now()) / timedelta(hours=1)
     if hours_left < series.refund_cutoff_hours:
         raise TooLateToCancel(
             f"{booking['title']} starts in {max(hours_left, 0):.1f} hour(s); cancellation closes "

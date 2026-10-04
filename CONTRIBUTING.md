@@ -20,8 +20,11 @@ Standard `src/` layout: `src/maya/` is the one installable package.
   every domain's `MCPServer` (from each `simulations/<domain>/mcp_tools.py`)
   into one registry that `cli.py` dispatches by name. Neither defines any
   tools itself.
-- `src/maya/world/` is shared, domain-agnostic world data — today, Aira's
-  zones and road graph, used by delivery and hotels.
+- `src/maya/world/` is shared, domain-agnostic world data and machinery —
+  Aira's zones and road graph, and the world clock (`clock.py`) with its
+  `world` MCP server. **Always read the time with `maya.world.clock.now()`,
+  never `datetime.now()`** — it's Maya time (MYT), and it can be scaled or
+  skipped; a test fails if a domain reads the host clock.
 - Reference data (airports and the weekly schedule, vendors and menus,
   hotels and room types, the rental fleet, venues and event series) lives in each domain's
   `data/*.csv` — human-editable, reloaded into SQLite on every start. Edit a
@@ -68,8 +71,8 @@ docker rm -f maya && docker network rm smoke
 Tests live in `tests/`, one file per domain, and run on Python 3.10 and 3.13
 in CI. Two things make them deterministic (see `tests/conftest.py`): every
 run uses a throwaway database via `MAYA_DB_PATH`, never your `maya.db`, and
-the clock is frozen at a fixed Monday morning, moved only by the `clock`
-fixture. A test for a time-based rule should set the clock, not depend on
+the world clock is frozen at a fixed Monday morning (Maya time), moved only
+by the `clock` fixture. A test for a time-based rule should set the clock, not depend on
 when it runs.
 
 Code style: standard library first, type hints throughout, docstrings that
