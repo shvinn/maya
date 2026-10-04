@@ -1,13 +1,15 @@
 <h1 align="center">Maya</h1>
 
 <p align="center">
-  <em>A fictional island, exposed as MCP tools —<br/>
-  so you can build and test AI agents without renting a real one.</em>
+  <em>An API simulator.<br/>
+  A SimCity.<br/>
+  The Matrix — for AI agents.</em>
 </p>
 
 ## Overview
 
-Maya is a simulated island nation for AI agents to act in, exposed as MCP
+Maya is an API simulator for AI agents: a fictional world of everyday
+services — flights, hotels, car rental and food delivery — exposed as MCP
 tools and running locally. Four domains exist today:
 
 - **Flights** — search, book, retrieve and cancel flights on a fictional
@@ -32,8 +34,19 @@ Each domain has its own bookings/orders that persist across restarts
 cancellation windows, undeliverable zones) are real rules to discover, not canned
 responses.
 
-```
-your agent  ──►  MCP (stdio or HTTP)  ──►  Maya flights / delivery / hotels / cars
+```mermaid
+flowchart LR
+    agent["Your AI agent"] -->|"MCP · stdio or HTTP"| maya
+
+    subgraph maya["Maya"]
+        flights["Flights"]
+        delivery["Delivery"]
+        hotels["Hotels"]
+        cars["Cars"]
+    end
+
+    csv["World data (CSV)<br/>airports · vendors · hotels · fleet"] -.->|"loaded on start"| maya
+    maya <-->|"real state"| db[("maya.db<br/>bookings · orders · rentals")]
 ```
 
 ## Install

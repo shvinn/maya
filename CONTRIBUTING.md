@@ -1,9 +1,10 @@
 # Contributing to Maya
 
-Maya is a simulated island for AI agents to act in: flights, hotels, car
-rental and food delivery, each exposed as MCP tools. This document is about
-contributing to that: the domain toolsets, the fictional island they run on,
-and the house style they all follow.
+Maya is an API simulator for AI agents: a fictional world of everyday
+services — flights, hotels, car rental and food delivery — exposed as MCP
+tools and running locally. This document is about contributing to that: the
+domain toolsets, the fictional world they run in, and the house style they
+all follow.
 
 ## How it's built
 
