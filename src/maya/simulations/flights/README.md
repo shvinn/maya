@@ -14,12 +14,39 @@ design record (`.docs/FLIGHTS.md`, gitignored/local-only — see
 pay step — none of that exists in the code yet. Don't assume a held offer,
 an expiry window, or a separate payment call are things you can rely on.
 
-## Every flight is direct
+## Direct or one stop — never more
 
-There is no connection-building or multi-leg itinerary construction. If a
-city pair has no non-stop service, the answer is "no flight," not something
-to route around via a layover — `flights_search_flights` will never return
-a multi-leg option.
+`flights_search_flights` returns direct flights and one-stop connections
+together; each option has `stops` (0 or 1) and a `legs` list. Pass
+`max_stops=0` for direct only. Two stops are never built — if a city pair
+has neither a direct flight nor a one-stop connection, there is no service.
+
+A connection is two flights sold as **one booking**: one reference, one
+fare, both legs' seats taken together, and cancelled together. To book one, pass the first leg as `flight_number`/`date` and the
+second as `connecting_flight_number`/`connecting_date`. The rules a pair
+must meet (anything else fails with `invalid_connection`):
+
+- the layover is 45 minutes to 6 hours, at the airport the first leg lands
+  at — **or** it's an overnight connection: the first leg lands at 18:00 or
+  later and the second leaves the next morning before 12:00. Those options
+  carry `overnight: true`; the traveller sleeps at the connection airport,
+  and no hotel comes with the ticket (Aira has hotels — see the hotels
+  domain);
+- **Puffin Air never connects.** It's ultra-low-cost and sells point-to-point
+  only, even Puffin-to-Puffin. Maya Air, Aira Express and Coral Wings all
+  connect with one another.
+
+A connection's `seats_available` is whatever its fuller leg has left, so it
+can sell out because of either flight.
+
+## Connections on one airline are cheaper
+
+A connection where both legs are on the same airline costs 20% less than
+buying the two flights separately — airlines price their own connections to
+compete (`connection_discount_per_passenger` shows the saving). A
+connection across two airlines costs the plain sum of its legs. So a
+one-stop trip can undercut a pricier airline's direct flight, and two
+connections over the same hub can differ in price just by who flies them.
 
 ## Seats and price are computed live, not fixed
 
@@ -32,7 +59,7 @@ legitimately return different numbers — that's not a bug to work around.
 
 Puffin Air (`PF`) fares can never be cancelled — not a fee, not a tier,
 never. Every other airline allows a full refund any time up to 24 hours
-before departure, and cancellation is flatly impossible inside that window
+before departure (the first leg's departure, for a connection), and cancellation is flatly impossible inside that window
 (`flights_cancel_booking` fails with `too_late_to_cancel`, not a partial
 refund). There's no middle case.
 

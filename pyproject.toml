@@ -1,7 +1,7 @@
 [project]
 name = "maya"
 version = "0.1.0"
-description = "A fictional island's flight network, exposed as simulated APIs and MCP tools."
+description = "A fictional island -- flights, hotels, car rental and food delivery -- exposed as MCP tools for AI agents."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

@@ -7,7 +7,9 @@ file. ``reset()`` (the ``flights_reset_bookings`` tool) is the explicit way
 to empty it back out, which is also what tests use between runs.
 
 Booking is a single step. There is no held-then-paid flow and no priced offer to
-expire: you search, you book, you are confirmed. Two rules bite, because a
+expire: you search, you book, you are confirmed. A booking holds one flight, or
+two for a one-stop connection -- one reference, one fare (the sum of both legs),
+cancelled as a whole. Two rules bite, because a
 domain where nothing can be refused teaches an agent nothing: Puffin Air fares
 can never be cancelled, and everyone else can cancel for a full refund any time
 up to 24 hours before departure -- inside that window, cancellation isn't
@@ -25,6 +27,11 @@ Fares are computed, not stored: an airline's ``rate_per_minute`` (its price
 character -- Puffin cheap, Aira Express dear) times the flight's duration
 (the distance stand-in), nudged up by up to ``PRICE_SURGE_MAX`` as the flight
 fills. Prices are always whole coins.
+
+A connection's fare is the sum of its legs' fares, less
+``CONNECTION_DISCOUNT`` when both legs are on the same airline -- an airline
+prices its own connections to compete with a rival's direct flight, while
+a connection across two airlines (an interline) gets no such deal.
 """
 
 from __future__ import annotations
@@ -52,6 +59,9 @@ BACKGROUND_DEMAND_FLOOR_HOURS = 2
 #: Fare surcharge at fully sold-down, on top of the base rate. Kept modest --
 #: a full flight should cost more, not wildly more.
 PRICE_SURGE_MAX = 0.3
+
+#: Off the summed leg fares, for a connection on a single airline.
+CONNECTION_DISCOUNT = 0.2
 
 def _get_booking(reference: str) -> dict | None:
     row = db.connect().execute(
@@ -133,6 +143,17 @@ def price_per_passenger(flight: ScheduledFlight) -> int:
     return round(base * (1 + PRICE_SURGE_MAX * load_factor))
 
 
+def itinerary_fare(legs: list[ScheduledFlight]) -> tuple[int, int]:
+    """(fare per passenger, discount per passenger) for a direct flight or
+    a connection."""
+    summed = sum(price_per_passenger(flight) for flight in legs)
+    single_airline = len({flight.pattern.airline for flight in legs}) == 1
+    if len(legs) < 2 or not single_airline:
+        return summed, 0
+    fare = round(summed * (1 - CONNECTION_DISCOUNT))
+    return fare, summed - fare
+
+
 def is_refundable(airline: str) -> bool:
     return airline not in NON_REFUNDABLE_AIRLINES
 
@@ -147,22 +168,9 @@ def policy_text(airline: str) -> str:
     )
 
 
-def book(flight: ScheduledFlight, passenger_names: list[str], contact_email: str) -> dict:
-    """Confirm a booking on one flight. Raises ``SoldOut`` if seats have gone."""
-    count = len(passenger_names)
-    if seats_available(flight) < count:
-        raise SoldOut(
-            f"{flight.flight_number} on {flight.date.isoformat()} has "
-            f"{seats_available(flight)} seat(s) left; {count} requested."
-        )
-
+def _leg_record(flight: ScheduledFlight, fare: int) -> dict:
     pattern = flight.pattern
-    reference = _next_reference()
-    fare = price_per_passenger(flight)
-    _adjust_seats_sold(flight.key, count)
-    booking = {
-        "booking_reference": reference,
-        "status": "CONFIRMED",
+    return {
         "flight_number": pattern.flight_number,
         "airline": pattern.airline,
         "airline_name": AIRLINES[pattern.airline].name,
@@ -173,9 +181,49 @@ def book(flight: ScheduledFlight, passenger_names: list[str], contact_email: str
         "departure": flight.departure.strftime("%Y-%m-%d %H:%M"),
         "arrival": flight.arrival.strftime("%Y-%m-%d %H:%M"),
         "duration_minutes": pattern.duration_minutes,
+        "price_per_passenger": {"amount": fare, "currency": CURRENCY},
+    }
+
+
+def _legs(booking: dict) -> list[dict]:
+    """A booking's flights. Bookings made before connections existed were
+    flat, single-flight records with no ``legs`` list."""
+    return booking.get("legs") or [booking]
+
+
+def book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email: str) -> dict:
+    """Confirm a booking on one flight, or two for a one-stop connection
+    (the caller has already checked the pair is a valid connection). Raises
+    ``SoldOut`` if any leg doesn't have the seats -- and then nothing is
+    booked, not even the leg that did."""
+    count = len(passenger_names)
+    for flight in legs:
+        if seats_available(flight) < count:
+            raise SoldOut(
+                f"{flight.flight_number} on {flight.date.isoformat()} has "
+                f"{seats_available(flight)} seat(s) left; {count} requested."
+            )
+
+    records = [_leg_record(flight, price_per_passenger(flight)) for flight in legs]
+    fare, discount = itinerary_fare(legs)
+    for flight in legs:
+        _adjust_seats_sold(flight.key, count)
+    first, last = records[0], records[-1]
+    booking = {
+        "booking_reference": _next_reference(),
+        "status": "CONFIRMED",
+        "stops": len(records) - 1,
+        **({k: v for k, v in first.items() if k != "price_per_passenger"} if len(records) == 1 else {}),
+        "origin": first["origin"],
+        "destination": last["destination"],
+        "date": first["date"],
+        "departure": first["departure"],
+        "arrival": last["arrival"],
+        "legs": records,
         "passengers": list(passenger_names),
         "passenger_count": count,
         "price_per_passenger": {"amount": fare, "currency": CURRENCY},
+        **({"connection_discount_per_passenger": {"amount": discount, "currency": CURRENCY}} if discount else {}),
         "total_price": {"amount": fare * count, "currency": CURRENCY},
         "contact_email": contact_email,
         "booked_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -209,8 +257,9 @@ def cancel(reference: str) -> dict:
     if booking["status"] == "CANCELLED":
         raise AlreadyCancelled(f"Booking {booking['booking_reference']} is already cancelled.")
 
-    if not is_refundable(booking["airline"]):
-        raise NotRefundable(policy_text(booking["airline"]))
+    for leg in _legs(booking):
+        if not is_refundable(leg["airline"]):
+            raise NotRefundable(policy_text(leg["airline"]))
 
     departure = datetime.strptime(booking["departure"], "%Y-%m-%d %H:%M")
     hours_left = (departure - datetime.now()) / timedelta(hours=1)
@@ -222,8 +271,8 @@ def cancel(reference: str) -> dict:
         )
 
     booking["status"] = "CANCELLED"
-    key = f"{booking['flight_number']}/{booking['date']}"
-    _adjust_seats_sold(key, -booking["passenger_count"])
+    for leg in _legs(booking):
+        _adjust_seats_sold(f"{leg['flight_number']}/{leg['date']}", -booking["passenger_count"])
 
     amount = booking["total_price"]["amount"]
     booking["refund"] = {"amount": amount, "currency": CURRENCY}

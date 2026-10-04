@@ -1,0 +1,8 @@
+car_id,make,model,model_age_years,car_class,seats,transmission,fleet_size,daily_rate
+MPP,Marlin,Pip,2,mini,4,manual,8,28
+KSW,Kestrel,Swift,1,economy,5,automatic,20,35
+MCO,Marlin,Coast,1,compact,5,automatic,16,42
+KVT,Kestrel,Volt,0,electric,5,automatic,8,55
+TRG,Tamaru,Ridge,0,suv,5,automatic,12,65
+OVY,Orca,Voyager,1,minivan,7,automatic,6,80
+VGR,Vela,Grand,0,premium,5,automatic,6,110

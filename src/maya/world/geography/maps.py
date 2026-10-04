@@ -3,7 +3,7 @@
 Domain-agnostic "world engine" infrastructure (VISION.md: "small,
 domain-agnostic, shared by everything") -- distinct from
 simulations/<domain>/, which owns what's actually being sold. Zones have no
-price and are not inventory; any domain (delivery today, others later) can
+price and are not inventory; any domain (delivery and hotels today) can
 depend on this without owning it.
 
 Each city gets its own subdirectory here holding that city's zones.csv and
