@@ -1,0 +1,11 @@
+code,name,zone,style,stars,cancel_cutoff_hours
+TWH,Tradewind Hostel,AIR-OLD,hostel,1,
+OAC,Old Aira Courtyard,AIR-OLD,boutique,4,48
+TCG,The Capitol Grand,AIR-CAP,luxury,5,72
+HLH,Harbourlight Hotel,AIR-PRT,mid,3,24
+LTW,Ledger Tower Hotel,AIR-FIN,business,4,24
+MLG,Market Lane Guesthouse,AIR-MKT,guesthouse,2,24
+CSL,The Consul,AIR-EMB,luxury,5,72
+RVS,Riverside Suites,AIR-RIV,apartment,4,48
+PTL,The Painted Lodge,AIR-CRN,budget,2,
+SAH,Skyview Airport Hotel,AIR-APT,business,3,6

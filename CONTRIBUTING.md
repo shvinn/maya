@@ -1,15 +1,16 @@
 # Contributing to Maya
 
-Maya is a flight booking simulator for AI agents. This document is about
-contributing to that: the flight toolset, the fictional island it runs on,
-and the house style both follow.
+Maya is a simulated island for AI agents to act in: flights, hotels, car
+rental and food delivery, each exposed as MCP tools. This document is about
+contributing to that: the domain toolsets, the fictional island they run on,
+and the house style they all follow.
 
 ## How it's built
 
 Standard `src/` layout: `src/maya/` is the one installable package.
 
-- `src/maya/simulations/<domain>/` (`flights/`, `delivery/`) is the domain
-  logic — reference data access, booking/ordering rules, and the shared
+- `src/maya/simulations/<domain>/` (`flights/`, `delivery/`, `hotels/`,
+  `cars/`) is the domain logic — reference data access, booking/ordering rules, and the shared
   SQLite connection in that domain's own `db.py` — plus that domain's own
   `mcp_tools.py`, which is the thin `<domain>_*` MCP tool adapter for it.
   No business logic lives in a domain's `mcp_tools.py`; it calls straight
@@ -18,13 +19,15 @@ Standard `src/` layout: `src/maya/` is the one installable package.
   every domain's `MCPServer` (from each `simulations/<domain>/mcp_tools.py`)
   into one registry that `cli.py` dispatches by name. Neither defines any
   tools itself.
-- Reference data (airports, airlines, aircraft, the weekly schedule) lives in
-  `src/maya/simulations/flights/data/*.csv` — human-editable, reloaded into
-  SQLite on every start. Edit a row there and the world changes; no code
-  change needed.
-- Bookings and seats sold are the one part of the world that is real,
-  persisted state (SQLite, survives a restart). Everything else is derived
-  fresh from the CSV files.
+- `src/maya/world/` is shared, domain-agnostic world data — today, Aira's
+  zones and road graph, used by delivery and hotels.
+- Reference data (airports and the weekly schedule, vendors and menus,
+  hotels and room types, the rental fleet) lives in each domain's
+  `data/*.csv` — human-editable, reloaded into SQLite on every start. Edit a
+  row there and the world changes; no code change needed.
+- Bookings, orders and rentals — and the seats, rooms and cars they hold —
+  are the one part of the world that is real, persisted state (SQLite,
+  survives a restart). Everything else is derived fresh from the CSV files.
 
 ## House rules
 

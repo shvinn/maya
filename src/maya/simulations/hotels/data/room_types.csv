@@ -1,0 +1,23 @@
+room_type_id,hotel,name,max_guests,rooms_total,nightly_rate
+TWH-DRM,TWH,Bed in 8-Bed Dorm,1,24,18
+TWH-PRV,TWH,Private Double,2,6,45
+OAC-DBL,OAC,Courtyard Double,2,14,140
+OAC-STE,OAC,Garden Suite,3,4,190
+TCG-STD,TCG,Standard King,2,40,280
+TCG-DLX,TCG,Deluxe City View,2,20,360
+TCG-STE,TCG,Presidential Suite,4,2,550
+HLH-STD,HLH,Standard Queen,2,30,90
+HLH-SEA,HLH,Harbour View Double,2,12,120
+HLH-FAM,HLH,Family Room,4,6,150
+LTW-STD,LTW,Business King,2,60,110
+LTW-EXE,LTW,Executive Room,2,15,160
+MLG-SGL,MLG,Single Room,1,4,55
+MLG-DBL,MLG,Double Room,2,6,80
+CSL-STD,CSL,Classic Room,2,24,260
+CSL-STE,CSL,Ambassador Suite,4,4,480
+RVS-1BR,RVS,One-Bedroom Apartment,2,10,160
+RVS-2BR,RVS,Two-Bedroom Apartment,5,5,240
+PTL-DBL,PTL,Double Room,2,12,40
+PTL-TRP,PTL,Triple Room,3,6,65
+SAH-STD,SAH,Standard Queen,2,80,95
+SAH-DLX,SAH,Deluxe King,2,20,130
