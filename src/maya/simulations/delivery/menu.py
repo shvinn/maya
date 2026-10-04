@@ -10,7 +10,7 @@ and on the owning vendor's cuisine, scored the same way airports.search is
 (exact name match > name prefix > substring in name or cuisine), and
 flattens each result with that vendor's code/name/zone attached -- an agent
 searching "curry" needs to know which vendor to order from in the same
-response, not a second call away (TOOL-DESIGN.md: "flat beats nested").
+response, not a second call away -- flat beats nested.
 """
 
 from __future__ import annotations

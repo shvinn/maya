@@ -68,10 +68,8 @@ does not account for traffic, weather, or time of day.
 
 Vendor cuisines use real-world terms (Chinese, Indian, Mexican, Thai,
 Italian, etc.) so menu variety reads naturally, but every vendor name is
-fictional — none of the 21 vendors are real restaurants or chains, per the
-project's canon rule against real-brand disguises. (That canon lives in
-`.docs/WORLD.md`, which is gitignored/local-only — see `CONTRIBUTING.md` if
-you don't have it.)
+fictional — none of the 21 vendors are real restaurants or chains. Maya
+never reproduces or thinly disguises a real brand.
 
 ## Currency is bucks
 

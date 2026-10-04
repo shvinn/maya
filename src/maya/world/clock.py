@@ -31,22 +31,15 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from maya import storage
+
 MYT = timezone(timedelta(hours=-8), "MYT")
 TIMEZONE_LABEL = "MYT (UTC-08:00)"
 MAX_SCALE = 10_000
 
 
-def _default_db_path() -> Path:
-    """Same location rule as every domain's db.py: the repo root when
-    running from a clone, else the working directory."""
-    for candidate in Path(__file__).resolve().parents:
-        if (candidate / "pyproject.toml").exists() and (candidate / "src" / "maya").is_dir():
-            return candidate / "maya.db"
-    return Path.cwd() / "maya.db"
-
-
-#: MAYA_DB_PATH overrides the location -- the Docker image points it at a volume.
-DB_PATH = Path(os.environ["MAYA_DB_PATH"]) if "MAYA_DB_PATH" in os.environ else _default_db_path()
+#: The shared maya.db -- see maya.storage for where it lives and why.
+DB_PATH = storage.db_path()
 
 _local = threading.local()
 
@@ -58,14 +51,21 @@ def _connect() -> sqlite3.Connection:
         conn = sqlite3.connect(DB_PATH)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout = 5000")
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS world_clock ("
-            " id INTEGER PRIMARY KEY CHECK (id = 1),"
-            " anchor_real REAL NOT NULL, anchor_maya TEXT NOT NULL, scale REAL NOT NULL)"
-        )
-        conn.commit()
         _local.connection = conn
     return conn
+
+
+def _ensure_table(conn: sqlite3.Connection) -> None:
+    """Create the clock's table -- only ever from a write that changes the
+    clock. Reading the time must never write: domains read it inside their
+    booking transactions, and a write on this separate connection would wait
+    for that transaction's lock, held by the same thread, until it timed out.
+    """
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS world_clock ("
+        " id INTEGER PRIMARY KEY CHECK (id = 1),"
+        " anchor_real REAL NOT NULL, anchor_maya TEXT NOT NULL, scale REAL NOT NULL)"
+    )
 
 
 def _real_now() -> float:
@@ -75,7 +75,12 @@ def _real_now() -> float:
 
 def _maya_at(real_ts: float) -> tuple[datetime, float]:
     """(Maya time, scale) at a real instant."""
-    row = _connect().execute("SELECT anchor_real, anchor_maya, scale FROM world_clock WHERE id = 1").fetchone()
+    try:
+        row = _connect().execute("SELECT anchor_real, anchor_maya, scale FROM world_clock WHERE id = 1").fetchone()
+    except sqlite3.OperationalError as e:
+        if "no such table" not in str(e):
+            raise
+        row = None  # never changed on this database: real time at 1:1
     if row is None:
         return datetime.fromtimestamp(real_ts, MYT).replace(tzinfo=None), 1.0
     elapsed = (real_ts - row["anchor_real"]) * row["scale"]
@@ -84,6 +89,7 @@ def _maya_at(real_ts: float) -> tuple[datetime, float]:
 
 def _save(maya: datetime, scale: float, real_ts: float) -> None:
     conn = _connect()
+    _ensure_table(conn)
     conn.execute(
         "INSERT OR REPLACE INTO world_clock (id, anchor_real, anchor_maya, scale) VALUES (1, ?, ?, ?)",
         (real_ts, maya.isoformat(), scale),
@@ -135,6 +141,7 @@ def reset() -> dict:
     this steps backwards -- bookings made in the skipped-ahead time may then
     look like they're in the future."""
     conn = _connect()
+    _ensure_table(conn)
     conn.execute("DELETE FROM world_clock")
     conn.commit()
     return state()

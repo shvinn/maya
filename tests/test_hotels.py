@@ -13,7 +13,7 @@ import pytest
 from maya.simulations.hotels import bookings, hotels
 from maya.simulations.hotels import mcp_tools as t
 
-from .conftest import NOW
+from .conftest import NOW, error_code, error_of
 
 
 def day(n: int) -> str:
@@ -23,9 +23,6 @@ def day(n: int) -> str:
 def book(room: str = "HLH-STD", check_in: int = 10, nights: int = 2, guests: int = 2, email: str = "guest@example.mb") -> dict:
     return t.hotels_book_room(room, day(check_in), day(check_in + nights), guests, "Test Guest", email)
 
-
-def error_code(result: dict) -> str | None:
-    return result.get("error", {}).get("code")
 
 
 # --- search -------------------------------------------------------------------
@@ -93,7 +90,7 @@ def test_a_room_type_sells_out_on_its_fullest_night():
     assert codes[0] == "OK"
     assert "sold_out" in codes
     sold_out = next(r for r in results if error_code(r) == "sold_out")
-    assert day(1) in sold_out["error"]["message"]
+    assert day(1) in error_of(sold_out)["message"]
 
 
 def test_too_many_guests_for_the_room():

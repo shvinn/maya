@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 
+from maya import storage
 from maya.world import clock
 from maya.world.geography import maps
 
@@ -49,7 +50,6 @@ def _save_order(order: dict) -> None:
         "INSERT OR REPLACE INTO orders (order_id, data) VALUES (?, ?)",
         (order["order_id"], json.dumps(order)),
     )
-    conn.commit()
 
 
 def _all_orders() -> list[dict]:
@@ -57,24 +57,17 @@ def _all_orders() -> list[dict]:
     return [json.loads(row["data"]) for row in rows]
 
 
-def _init_counter() -> int:
-    """Resume the reference counter from what's already placed, so a
-    restart never reissues a reference that's still on disk."""
-    row = db.connect().execute("SELECT COUNT(*) AS n FROM orders").fetchone()
-    return row["n"] if row else 0
-
-
-_counter = _init_counter()
-
-
 def _next_order_id() -> str:
     """A plain, sequential order number -- the way a receipt or a delivery
     app shows one, not a randomised locator like a flight's PNR. There is
     no reason for a food order to hide its sequence the way a booking
-    reference does across a whole airline's reservation system."""
-    global _counter
-    _counter += 1
-    return str(1000 + _counter)
+    reference does across a whole airline's reservation system.
+
+    Numbered from the orders already stored, read inside the placing
+    transaction -- never from an in-memory counter, which two processes
+    sharing the database would both hand out.
+    """
+    return str(1000 + db.connect().execute("SELECT COUNT(*) AS n FROM orders").fetchone()["n"] + 1)
 
 
 def _status(order: dict) -> str:
@@ -93,12 +86,13 @@ def _status(order: dict) -> str:
 
 def _with_live_status(order: dict) -> dict:
     out = dict(order)
+    out.setdefault("reference", out["order_id"])  # records stored before it existed
     out["status"] = _status(order)
     out.pop("cancelled", None)
     return out
 
 
-def place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phone: str) -> dict:
+def _place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phone: str) -> dict:
     """Confirm an order at one vendor. Raises VendorNotFound, ItemNotFound or
     ZoneNotDeliverable."""
     vendor = vendors.get(vendor_code)
@@ -131,7 +125,8 @@ def place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phone
     total = subtotal + vendor.delivery_fee
 
     order = {
-        "order_id": _next_order_id(),
+        "order_id": (reference := _next_order_id()),
+        "reference": reference,
         "cancelled": False,
         "vendor_code": vendor.code,
         "vendor_name": vendor.name,
@@ -150,6 +145,12 @@ def place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phone
     _save_order(order)
     return _with_live_status(order)
 
+def place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phone: str) -> dict:
+    """Place atomically: every check and write below happens in one
+    transaction (see maya.storage.transaction)."""
+    with storage.transaction(db.connect()):
+        return _place(vendor_code, items, delivery_zone, contact_phone)
+
 
 def get(order_id: str) -> dict | None:
     order = _get_order((order_id or "").strip().upper())
@@ -167,7 +168,7 @@ def list_all(phone: str | None = None, status: str | None = None) -> list[dict]:
     return sorted(out, key=lambda o: o["placed_at"])
 
 
-def cancel(order_id: str) -> dict:
+def _cancel(order_id: str) -> dict:
     """Cancel an order. Only possible while it is still PREPARING; once a
     courier has it, it can't be recalled."""
     order = _get_order((order_id or "").strip().upper())
@@ -188,9 +189,16 @@ def cancel(order_id: str) -> dict:
     _save_order(order)
     return {
         "order_id": order["order_id"],
+        "reference": order["order_id"],
         "status": "CANCELLED",
         "reason": "Cancelled before the courier picked it up.",
     }
+
+def cancel(order_id: str) -> dict:
+    """Cancel atomically: every check and write below happens in one
+    transaction (see maya.storage.transaction)."""
+    with storage.transaction(db.connect()):
+        return _cancel(order_id)
 
 
 def reset() -> int:
@@ -198,9 +206,7 @@ def reset() -> int:
 
     Returns the number of orders cleared.
     """
-    global _counter
     cleared = db.reset_world()
-    _counter = 0
     return cleared
 
 

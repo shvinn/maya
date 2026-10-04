@@ -21,6 +21,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
+from mcp_types import CallToolResult
 
 os.environ["MAYA_DB_PATH"] = str(Path(tempfile.mkdtemp(prefix="maya-tests-")) / "maya.db")
 
@@ -67,3 +68,19 @@ def fresh_world() -> None:
     for module in (flight_bookings, hotel_bookings, rentals, orders, tickets):
         module.reset()
     world_clock.reset()
+
+
+def error_of(result) -> dict | None:
+    """The ``{"code", "message", "hint"}`` of a refused tool call, or None.
+
+    Refusals come back as MCP tool errors (``is_error`` set, details in
+    structured content -- see maya.tool_errors); anything else succeeded.
+    """
+    if isinstance(result, CallToolResult) and result.is_error:
+        return (result.structured_content or {}).get("error")
+    return None
+
+
+def error_code(result) -> str | None:
+    error = error_of(result)
+    return error["code"] if error else None

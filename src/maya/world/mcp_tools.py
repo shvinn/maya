@@ -11,16 +11,15 @@ from __future__ import annotations
 
 from mcp.server.mcpserver import MCPServer
 
+from maya.tool_errors import tool_error
+
 from . import clock
 
 mcp = MCPServer("maya-world")
 
 
-def _error(e: clock.ClockError) -> dict:
-    error: dict = {"code": e.code, "message": str(e)}
-    if e.hint:
-        error["hint"] = e.hint
-    return {"error": error}
+def _error(e: clock.ClockError):
+    return tool_error(e.code, str(e), e.hint)
 
 
 def add_time_tool(server: MCPServer) -> None:

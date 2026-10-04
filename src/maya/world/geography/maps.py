@@ -1,7 +1,7 @@
 """Zones and road distances, city by city.
 
-Domain-agnostic "world engine" infrastructure (VISION.md: "small,
-domain-agnostic, shared by everything") -- distinct from
+Domain-agnostic world infrastructure -- small and shared by everything,
+distinct from
 simulations/<domain>/, which owns what's actually being sold. Zones have no
 price and are not inventory; any domain (delivery and hotels today) can
 depend on this without owning it.

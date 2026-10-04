@@ -68,8 +68,10 @@ uvx --from git+https://github.com/shvinn/maya maya serve --domain all
 ```
 
 Bookings, orders and rentals are kept in `maya.db` — at the repo root when
-running from a clone, otherwise in the folder you start the server from. Set
-`MAYA_DB_PATH` to put it somewhere else.
+running from a clone, otherwise in your user data folder
+(`~/Library/Application Support/maya` on macOS, `~/.local/share/maya` on
+Linux, `%LOCALAPPDATA%\maya` on Windows). Set `MAYA_DB_PATH` to put it
+somewhere else.
 
 ## Usage
 
@@ -95,6 +97,21 @@ To hook Maya up to Claude Desktop, Claude Code, Cursor or another MCP client,
 see [Connect an MCP client](#connect-an-mcp-client).
 
 MCP is the only interface today — no REST/OpenAPI yet.
+
+### Refusals and references
+
+When a rule says no — sold out, not refundable, too late to cancel — the tool
+call comes back as an **MCP tool error** (`isError: true`), with the details
+structured as `{"error": {"code", "message", "hint"}}`. `code` is stable and
+machine-readable (`sold_out`, `too_late_to_cancel`, ...); `hint` says honestly
+whether retrying can help. A client that only checks the error flag can't
+mistake a refused booking for a confirmed one.
+
+Every booking, rental, ticket purchase and order — and its cancellation —
+carries a `reference` field, the same key in every domain. (Each domain's
+own name for it, such as `booking_reference`, `rental_reference` or
+`order_id`, is still there too.) Bookings are atomic: two agents racing for
+the last seat can't both get it.
 
 ## Maya time
 
@@ -177,10 +194,9 @@ MCP clients don't start servers from inside it.
 
 No clone? Swap `uv run --directory /path/to/maya` for
 `uvx --from git+https://github.com/shvinn/maya`, and add
-`"env": {"MAYA_DB_PATH": "/path/to/maya.db"}` — clients often start servers
-from a folder Maya can't write to, and this also keeps every server's
-bookings in one place. `uvx` caches what it installs; add `--refresh` once to
-pick up a newer Maya.
+`"env": {"MAYA_DB_PATH": "/path/to/maya.db"}` if you want the bookings
+somewhere other than your user data folder. `uvx` caches what it installs;
+add `--refresh` once to pick up a newer Maya.
 
 ### 2. Docker, no clone (stdio)
 
