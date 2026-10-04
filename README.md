@@ -80,6 +80,8 @@ uv run maya serve                     # flights, MCP over streamable HTTP on :62
 uv run maya serve --domain delivery   # delivery, same, :6292
 uv run maya serve --domain hotels     # hotels, same, :6292
 uv run maya serve --domain cars       # car rental, same, :6292
+uv run maya serve --domain events     # events, same, :6292
+uv run maya serve --domain world      # world clock controls, same, :6292
 uv run maya serve --domain all        # all at once, one port, one path each:
                                        #   http://localhost:6292/flights/mcp
                                        #   http://localhost:6292/delivery/mcp
@@ -89,18 +91,8 @@ uv run maya serve --domain all        # all at once, one port, one path each:
                                        #   http://localhost:6292/world/mcp
 ```
 
-Or as stdio servers, e.g. for Claude Desktop / Claude Code:
-
-```json
-{
-  "mcpServers": {
-    "maya-flights": { "command": "uv", "args": ["run", "maya", "mcp", "flights"] },
-    "maya-delivery": { "command": "uv", "args": ["run", "maya", "mcp", "delivery"] },
-    "maya-hotels": { "command": "uv", "args": ["run", "maya", "mcp", "hotels"] },
-    "maya-cars": { "command": "uv", "args": ["run", "maya", "mcp", "cars"] }
-  }
-}
-```
+To hook Maya up to Claude Desktop, Claude Code, Cursor or another MCP client,
+see [Connect an MCP client](#connect-an-mcp-client).
 
 MCP is the only interface today — no REST/OpenAPI yet.
 
@@ -149,19 +141,6 @@ docker run -p 127.0.0.1:6292:6292 -v maya-data:/data ghcr.io/shvinn/maya serve -
 docker compose up                      # same as the first, from a clone
 ```
 
-Or as stdio servers for an MCP client config:
-
-```json
-{
-  "mcpServers": {
-    "maya-flights": {
-      "command": "docker",
-      "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "flights"]
-    }
-  }
-}
-```
-
 - Bookings, orders and rentals live in the `maya-data` volume, so they
   survive restarts and are shared by every container using it. Remove the
   volume (`docker volume rm maya-data`) for a fresh world.
@@ -170,6 +149,92 @@ Or as stdio servers for an MCP client config:
 - Images are built for `linux/amd64` and `linux/arm64`, which covers Linux,
   macOS (Intel and Apple Silicon) and Windows (x64 and ARM, via Docker
   Desktop's default Linux containers).
+
+## Connect an MCP client
+
+Pick one of three setups. Each gives you six servers: `flights`, `delivery`,
+`hotels`, `cars`, `events` and `world`. Give the agent you're testing the
+domain servers; keep `world` (the clock controls) for yourself, so the agent
+can't skip past its own deadlines.
+
+### 1. Local, from a clone (stdio)
+
+The client starts Maya itself. `--directory` points `uv` at your clone, since
+MCP clients don't start servers from inside it.
+
+```json
+{
+  "mcpServers": {
+    "maya-flights": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "flights"] },
+    "maya-delivery": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "delivery"] },
+    "maya-hotels": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "hotels"] },
+    "maya-cars": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "cars"] },
+    "maya-events": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "events"] },
+    "maya-world": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "world"] }
+  }
+}
+```
+
+No clone? Swap `uv run --directory /path/to/maya` for
+`uvx --from git+https://github.com/shvinn/maya`, and add
+`"env": {"MAYA_DB_PATH": "/path/to/maya.db"}` — clients often start servers
+from a folder Maya can't write to, and this also keeps every server's
+bookings in one place. `uvx` caches what it installs; add `--refresh` once to
+pick up a newer Maya.
+
+### 2. Docker, no clone (stdio)
+
+Each client session starts a short-lived container; all of them share the
+`maya-data` volume, so they share one world.
+
+```json
+{
+  "mcpServers": {
+    "maya-flights": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "flights"] },
+    "maya-delivery": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "delivery"] },
+    "maya-hotels": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "hotels"] },
+    "maya-cars": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "cars"] },
+    "maya-events": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "events"] },
+    "maya-world": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "world"] }
+  }
+}
+```
+
+### 3. Docker or a remote server (HTTP)
+
+Start one server for every domain — `docker run -p 127.0.0.1:6292:6292 -v
+maya-data:/data ghcr.io/shvinn/maya`, `docker compose up`, or
+`uv run maya serve --domain all` — and point the client at its URLs. The
+config format varies by client; for example, Claude Code:
+
+```bash
+claude mcp add --transport http maya-flights http://localhost:6292/flights/mcp
+claude mcp add --transport http maya-delivery http://localhost:6292/delivery/mcp
+claude mcp add --transport http maya-hotels http://localhost:6292/hotels/mcp
+claude mcp add --transport http maya-cars http://localhost:6292/cars/mcp
+claude mcp add --transport http maya-events http://localhost:6292/events/mcp
+claude mcp add --transport http maya-world http://localhost:6292/world/mcp
+```
+
+or a project's `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "maya-flights": { "type": "http", "url": "http://localhost:6292/flights/mcp" },
+    "maya-delivery": { "type": "http", "url": "http://localhost:6292/delivery/mcp" },
+    "maya-hotels": { "type": "http", "url": "http://localhost:6292/hotels/mcp" },
+    "maya-cars": { "type": "http", "url": "http://localhost:6292/cars/mcp" },
+    "maya-events": { "type": "http", "url": "http://localhost:6292/events/mcp" },
+    "maya-world": { "type": "http", "url": "http://localhost:6292/world/mcp" }
+  }
+}
+```
+
+Clients that only speak stdio can bridge to a URL with `npx mcp-remote <url>`.
+On another machine, replace `localhost` with its address — but Maya has no
+authentication and everyone connected shares one world, so keep it on a
+private network or behind a VPN, never on the open internet.
 
 ## Contributing
 
