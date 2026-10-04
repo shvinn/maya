@@ -36,6 +36,7 @@ import math
 import random
 from datetime import date, datetime, time, timedelta
 
+from maya import storage
 from maya.world import clock
 
 from . import db, fleet
@@ -74,7 +75,6 @@ def _save_rental(rental: dict) -> None:
         "INSERT OR REPLACE INTO car_rentals (reference, data) VALUES (?, ?)",
         (rental["rental_reference"], json.dumps(rental)),
     )
-    conn.commit()
 
 
 def _all_rentals() -> list[dict]:
@@ -98,25 +98,19 @@ def _adjust_cars_out(car_id: str, days: list[date], delta: int) -> None:
             "INSERT OR REPLACE INTO cars_out (car_id, day, count) VALUES (?, ?, ?)",
             (car_id, day.isoformat(), new_count),
         )
-    conn.commit()
-
-
-def _init_counter() -> int:
-    """Resume the reference counter from what's already booked, so a
-    restart never reissues a locator that's still on disk."""
-    row = db.connect().execute("SELECT COUNT(*) AS n FROM car_rentals").fetchone()
-    return row["n"] if row else 0
-
-
-_counter = _init_counter()
 
 
 def _next_reference() -> str:
     """A six-character locator, same generator as flights but salted
-    differently from flights and hotels so references never collide."""
-    global _counter
-    _counter += 1
-    rng = random.Random((_counter * 2654435761 + 0xCA125) % 2**32)
+    differently from flights and hotels so references never collide.
+
+    Numbered from the bookings already stored, read inside the booking's
+    transaction -- never from an in-memory counter, which two processes
+    sharing the database would both hand out (and the second booking would
+    overwrite the first).
+    """
+    n = db.connect().execute("SELECT COUNT(*) AS n FROM car_rentals").fetchone()["n"] + 1
+    rng = random.Random((n * 2654435761 + 0xCA125) % 2**32)
     return "".join(rng.choice(_ALPHABET) for _ in range(6))
 
 
@@ -224,12 +218,13 @@ def _status(rental: dict) -> str:
 
 def _with_live_status(rental: dict) -> dict:
     out = dict(rental)
+    out.setdefault("reference", out["rental_reference"])  # records stored before it existed
     out["status"] = _status(rental)
     out.pop("cancelled", None)
     return out
 
 
-def book(
+def _book(
     car_id: str,
     pickup_at: str,
     dropoff_at: str,
@@ -254,7 +249,8 @@ def book(
     q = quote(car, days)
     _adjust_cars_out(car.car_id, days, 1)
     rental = {
-        "rental_reference": _next_reference(),
+        "rental_reference": (reference := _next_reference()),
+        "reference": reference,
         "cancelled": False,
         "car_id": car.car_id,
         "car": car.label(),
@@ -276,6 +272,20 @@ def book(
     _save_rental(rental)
     return _with_live_status(rental)
 
+def book(
+    car_id: str,
+    pickup_at: str,
+    dropoff_at: str,
+    driver_name: str,
+    driver_age: int,
+    contact_email: str,
+) -> dict:
+    """Book atomically: every check and write below happens in one
+    transaction (see maya.storage.transaction), so concurrent bookings
+    can't both take the last of anything."""
+    with storage.transaction(db.connect()):
+        return _book(car_id, pickup_at, dropoff_at, driver_name, driver_age, contact_email)
+
 
 def get(reference: str) -> dict | None:
     rental = _get_rental((reference or "").strip().upper())
@@ -293,7 +303,7 @@ def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
     return sorted(out, key=lambda r: (r["pickup_at"], r["rental_reference"]))
 
 
-def cancel(reference: str) -> dict:
+def _cancel(reference: str) -> dict:
     """Cancel a rental: free any time before pickup, impossible after."""
     rental = _get_rental((reference or "").strip().upper())
     if rental is None:
@@ -317,10 +327,18 @@ def cancel(reference: str) -> dict:
     _save_rental(rental)
     return {
         "rental_reference": rental["rental_reference"],
+        "reference": rental["rental_reference"],
         "status": "CANCELLED",
         "refund": refund,
         "reason": "Cancelled before pickup: full refund.",
     }
+
+def cancel(reference: str) -> dict:
+    """Cancel atomically: every check and write below happens in one
+    transaction (see maya.storage.transaction), so two requests can't
+    cancel the same booking twice or release its inventory twice."""
+    with storage.transaction(db.connect()):
+        return _cancel(reference)
 
 
 def reset() -> int:
@@ -328,9 +346,7 @@ def reset() -> int:
 
     Returns the number of rentals cleared.
     """
-    global _counter
     cleared = db.reset_world()
-    _counter = 0
     return cleared
 
 

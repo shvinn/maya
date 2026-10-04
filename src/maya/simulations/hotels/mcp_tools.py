@@ -9,19 +9,13 @@ from __future__ import annotations
 
 from mcp.server.mcpserver import MCPServer
 
+from maya.tool_errors import tool_error as _error
 from maya.world.mcp_tools import add_time_tool
 
 from . import bookings, hotels
 
 mcp = MCPServer("aira-hotels")
 add_time_tool(mcp)
-
-
-def _error(code: str, message: str, hint: str | None = None) -> dict:
-    error: dict = {"code": code, "message": message}
-    if hint:
-        error["hint"] = hint
-    return {"error": error}
 
 
 @mcp.tool()

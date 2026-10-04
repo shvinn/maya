@@ -40,6 +40,7 @@ import json
 import random
 from datetime import datetime, timedelta
 
+from maya import storage
 from maya.world import clock
 
 from . import db
@@ -78,7 +79,6 @@ def _save_booking(booking: dict) -> None:
         "INSERT OR REPLACE INTO bookings (reference, data) VALUES (?, ?)",
         (booking["booking_reference"], json.dumps(booking)),
     )
-    conn.commit()
 
 
 def _all_bookings() -> list[dict]:
@@ -100,24 +100,18 @@ def _adjust_seats_sold(flight_key: str, delta: int) -> None:
         "INSERT OR REPLACE INTO seats_sold (flight_key, count) VALUES (?, ?)",
         (flight_key, new_count),
     )
-    conn.commit()
-
-
-def _init_counter() -> int:
-    """Resume the reference counter from what's already booked, so a
-    restart never reissues a locator that's still on disk."""
-    row = db.connect().execute("SELECT COUNT(*) AS n FROM bookings").fetchone()
-    return row["n"] if row else 0
-
-
-_counter = _init_counter()
 
 
 def _next_reference() -> str:
-    """A six-character locator. Looks random, is reproducible across runs."""
-    global _counter
-    _counter += 1
-    rng = random.Random(_counter * 2654435761 % 2**32)
+    """A six-character locator. Looks random, is reproducible across runs.
+
+    Numbered from the bookings already stored, read inside the booking's
+    transaction -- never from an in-memory counter, which two processes
+    sharing the database would both hand out (and the second booking would
+    overwrite the first).
+    """
+    n = db.connect().execute("SELECT COUNT(*) AS n FROM bookings").fetchone()["n"] + 1
+    rng = random.Random(n * 2654435761 % 2**32)
     return "".join(rng.choice(_ALPHABET) for _ in range(6))
 
 
@@ -193,7 +187,7 @@ def _legs(booking: dict) -> list[dict]:
     return booking.get("legs") or [booking]
 
 
-def book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email: str) -> dict:
+def _book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email: str) -> dict:
     """Confirm a booking on one flight, or two for a one-stop connection
     (the caller has already checked the pair is a valid connection). Raises
     ``SoldOut`` if any leg doesn't have the seats -- and then nothing is
@@ -212,7 +206,8 @@ def book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email:
         _adjust_seats_sold(flight.key, count)
     first, last = records[0], records[-1]
     booking = {
-        "booking_reference": _next_reference(),
+        "booking_reference": (reference := _next_reference()),
+        "reference": reference,
         "status": "CONFIRMED",
         "stops": len(records) - 1,
         **({k: v for k, v in first.items() if k != "price_per_passenger"} if len(records) == 1 else {}),
@@ -233,13 +228,28 @@ def book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email:
     _save_booking(booking)
     return booking
 
+def book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email: str) -> dict:
+    """Book atomically: every check and write below happens in one
+    transaction (see maya.storage.transaction), so concurrent bookings
+    can't both take the last of anything."""
+    with storage.transaction(db.connect()):
+        return _book(legs, passenger_names, contact_email)
+
+
+def _public(booking: dict) -> dict:
+    """A stored booking as returned to callers, with the shared ``reference``
+    key filled in for records stored before it existed."""
+    booking.setdefault("reference", booking["booking_reference"])
+    return booking
+
 
 def get(reference: str) -> dict | None:
-    return _get_booking((reference or "").strip().upper())
+    booking = _get_booking((reference or "").strip().upper())
+    return _public(booking) if booking else None
 
 
 def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
-    out = _all_bookings()
+    out = [_public(b) for b in _all_bookings()]
     if email:
         needle = email.strip().lower()
         out = [b for b in out if b["contact_email"].lower() == needle]
@@ -249,7 +259,7 @@ def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
     return sorted(out, key=lambda b: (b["date"], b["departure"]))
 
 
-def cancel(reference: str) -> dict:
+def _cancel(reference: str) -> dict:
     """Cancel a booking. Puffin Air fares can never be cancelled. Everyone
     else can cancel for a full refund any time up to 24 hours before
     departure; inside that window cancellation isn't possible at all."""
@@ -281,10 +291,18 @@ def cancel(reference: str) -> dict:
     _save_booking(booking)
     return {
         "booking_reference": booking["booking_reference"],
+        "reference": booking["booking_reference"],
         "status": "CANCELLED",
         "refund": {"amount": amount, "currency": CURRENCY},
         "reason": f"Cancelled more than {REFUND_CUTOFF_HOURS} hours before departure: full refund.",
     }
+
+def cancel(reference: str) -> dict:
+    """Cancel atomically: every check and write below happens in one
+    transaction (see maya.storage.transaction), so two requests can't
+    cancel the same booking twice or release its inventory twice."""
+    with storage.transaction(db.connect()):
+        return _cancel(reference)
 
 
 def reset() -> int:
@@ -292,9 +310,7 @@ def reset() -> int:
 
     Returns the number of bookings cleared.
     """
-    global _counter
     cleared = db.reset_world()
-    _counter = 0
     return cleared
 
 

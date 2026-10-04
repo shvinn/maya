@@ -2,15 +2,12 @@
 
 Thin adapter, on purpose: every tool here validates and shapes arguments,
 then calls straight into this package's own modules. No business logic
-lives here -- see FLIGHTS.md for the tool contract and DECISIONS.md D4 for
-why.
+lives here, so the same rules hold however the domain is exposed.
 
-Scope note: this exposes what is actually implemented. FLIGHTS.md's fuller
-spec describes a search -> hold -> pay lifecycle (``flights_get_offer``,
-a held booking, a separate pay step) and a ``flights_get_flight_status``
-tool; neither the offer/hold system nor flight-status simulation exist in
-the code yet, so those tools aren't wired up here. Booking today is the one
-step ``flights_book_flight`` describes: search, book, confirmed.
+Scope note: this exposes only what is implemented. There is no
+search -> hold -> pay lifecycle (no held offers, no separate pay step) and
+no flight-status simulation yet; booking is the one step
+``flights_book_flight`` describes: search, book, confirmed.
 """
 
 from __future__ import annotations
@@ -19,19 +16,13 @@ from datetime import date as Date
 
 from mcp.server.mcpserver import MCPServer
 
+from maya.tool_errors import tool_error as _error
 from maya.world.mcp_tools import add_time_tool
 
 from . import airports, bookings, connections, schedule, search
 
 mcp = MCPServer("maya-flights")
 add_time_tool(mcp)
-
-
-def _error(code: str, message: str, hint: str | None = None) -> dict:
-    error: dict = {"code": code, "message": message}
-    if hint:
-        error["hint"] = hint
-    return {"error": error}
 
 
 @mcp.tool()

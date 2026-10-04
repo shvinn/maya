@@ -6,9 +6,8 @@ from __future__ import annotations
 from maya.simulations.delivery import mcp_tools as t
 from maya.simulations.delivery import vendors
 
+from .conftest import error_code
 
-def error_code(result: dict) -> str | None:
-    return result.get("error", {}).get("code") if isinstance(result, dict) else None
 
 
 def place(zone: str = "AIR-OLD", items: list[dict] | None = None) -> dict:

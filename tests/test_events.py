@@ -14,12 +14,11 @@ import pytest
 from maya.simulations.events import catalog, tickets
 from maya.simulations.events import mcp_tools as t
 
+from .conftest import error_code
+
 TUE, FRI, SAT, SUN = "2030-03-05", "2030-03-08", "2030-03-09", "2030-03-10"
 SAT_FAR = "2030-04-06"  # 33 days out: outside the demand horizon
 
-
-def error_code(result) -> str | None:
-    return result.get("error", {}).get("code") if isinstance(result, dict) else None
 
 
 def book(event_id="SYM", day=SAT, section="ACH-STL", quantity=2, age=None, email="fan@example.mb") -> dict:

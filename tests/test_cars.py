@@ -10,7 +10,7 @@ import pytest
 from maya.simulations.cars import fleet, rentals
 from maya.simulations.cars import mcp_tools as t
 
-from .conftest import NOW
+from .conftest import NOW, error_code
 
 
 def at(days: float = 0, hours: float = 0) -> str:
@@ -20,9 +20,6 @@ def at(days: float = 0, hours: float = 0) -> str:
 def book(car: str = "KSW", pickup: str | None = None, dropoff: str | None = None, age: int = 30, email: str = "driver@example.mb") -> dict:
     return t.cars_book_car(car, pickup or at(days=5), dropoff or at(days=7), "Test Driver", age, email)
 
-
-def error_code(result: dict) -> str | None:
-    return result.get("error", {}).get("code")
 
 
 def test_single_airport_location():

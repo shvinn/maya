@@ -21,31 +21,15 @@ is no seats_sold-style depletion table to go with it.
 from __future__ import annotations
 
 import csv
-import os
 import sqlite3
 import threading
 from pathlib import Path
 
-
-def _default_db_path() -> Path:
-    """maya.db at the repo root when running from a clone, else in the
-    working directory.
-
-    The repo root is the nearest ancestor holding both pyproject.toml and
-    src/maya -- walking up for markers rather than hardcoding a parent count
-    keeps this working if the file moves, and requiring src/maya stops a
-    copy installed inside someone else's project from claiming *that*
-    project's root. An installed package has no repo root at all, so it
-    falls back to wherever the server is started.
-    """
-    for candidate in Path(__file__).resolve().parents:
-        if (candidate / "pyproject.toml").exists() and (candidate / "src" / "maya").is_dir():
-            return candidate / "maya.db"
-    return Path.cwd() / "maya.db"
+from maya import storage
 
 
-#: MAYA_DB_PATH overrides the location -- the Docker image points it at a volume.
-DB_PATH = Path(os.environ["MAYA_DB_PATH"]) if "MAYA_DB_PATH" in os.environ else _default_db_path()
+#: The shared maya.db -- see maya.storage for where it lives and why.
+DB_PATH = storage.db_path()
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
 #: Column name -> converter, applied when a CSV cell isn't already a string.
@@ -70,6 +54,9 @@ def _load_csv(table: str, columns: tuple[str, ...]) -> list[tuple]:
 #: connection can only be used on the thread that created it -- so each
 #: thread gets its own connection to the same file rather than sharing one.
 _local = threading.local()
+
+#: Whether this process has reloaded the reference tables from CSV yet.
+_reference_loaded = False
 
 
 def connect() -> sqlite3.Connection:
@@ -101,15 +88,21 @@ def _init(conn: sqlite3.Connection) -> None:
         );
         """
     )
-    for table, columns in _REFERENCE_TABLES.items():
-        rows = _load_csv(table, columns)
-        conn.execute(f"DELETE FROM {table}")
-        if rows:
-            placeholders = ", ".join("?" for _ in columns)
-            conn.executemany(
-                f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})",
-                rows,
-            )
+    global _reference_loaded
+    if not _reference_loaded:
+        # Once per process, not on every thread's first connection: the HTTP
+        # server opens a connection per worker thread, and rewriting the
+        # reference tables each time is needless write-lock traffic.
+        for table, columns in _REFERENCE_TABLES.items():
+            rows = _load_csv(table, columns)
+            conn.execute(f"DELETE FROM {table}")
+            if rows:
+                placeholders = ", ".join("?" for _ in columns)
+                conn.executemany(
+                    f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})",
+                    rows,
+                )
+        _reference_loaded = True
     conn.commit()
 
 

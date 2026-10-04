@@ -10,16 +10,13 @@ import pytest
 from maya.simulations.flights import bookings, connections
 from maya.simulations.flights import mcp_tools as t
 
-from .conftest import NOW
+from .conftest import NOW, error_code, error_of
 
 #: A Wednesday nine days after NOW -- every daily route flies, and it's well
 #: outside the 24-hour cancellation window.
 DAY = date(2030, 3, 13).isoformat()
 NEXT_DAY = date(2030, 3, 14).isoformat()
 
-
-def error_code(result: dict) -> str | None:
-    return result.get("error", {}).get("code")
 
 
 def seats_sold(flight_number: str, day: str) -> int:
@@ -121,7 +118,7 @@ def test_a_connection_is_one_booking_that_takes_and_releases_both_legs():
 def test_invalid_connections_are_rejected(first, second, reason):
     result = t.flights_book_flight(first, DAY, ["A"], "a@example.mb", second, DAY)
     assert error_code(result) == "invalid_connection"
-    assert reason in result["error"]["message"]
+    assert reason in error_of(result)["message"]
 
 
 def test_overnight_connection_needs_the_next_day_date():

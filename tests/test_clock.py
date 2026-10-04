@@ -15,7 +15,7 @@ from maya.simulations.delivery import mcp_tools as delivery
 from maya.world import clock
 from maya.world import mcp_tools as world
 
-from .conftest import REAL_NOW
+from .conftest import REAL_NOW, error_code
 
 #: 2030-03-04 17:00 UTC == 09:00 MYT (UTC-08:00).
 REAL_START = datetime(2030, 3, 4, 17, 0, tzinfo=timezone.utc).timestamp()
@@ -127,8 +127,8 @@ def test_maya_time_scale_env_var_applies_at_startup(real, monkeypatch):
 
 
 def test_world_tools_report_errors_as_error_codes(real):
-    assert world.world_set_time_scale(-5)["error"]["code"] == "invalid_scale"
-    assert world.world_advance_time(hours=-1)["error"]["code"] == "invalid_duration"
+    assert error_code(world.world_set_time_scale(-5)) == "invalid_scale"
+    assert error_code(world.world_advance_time(hours=-1)) == "invalid_duration"
     assert world.world_advance_time(minutes=30)["maya_time"] == "2030-03-04 09:30:00"
     assert world.world_reset_time()["maya_time"] == "2030-03-04 09:00:00"
 
