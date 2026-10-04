@@ -34,8 +34,19 @@ Each domain has its own bookings/orders that persist across restarts
 cancellation windows, undeliverable zones) are real rules to discover, not canned
 responses.
 
-```
-your agent  ──►  MCP (stdio or HTTP)  ──►  Maya flights / delivery / hotels / cars
+```mermaid
+flowchart LR
+    agent["Your AI agent"] -->|"MCP · stdio or HTTP"| maya
+
+    subgraph maya["Maya"]
+        flights["Flights"]
+        delivery["Delivery"]
+        hotels["Hotels"]
+        cars["Cars"]
+    end
+
+    csv["World data (CSV)<br/>airports · vendors · hotels · fleet"] -.->|"loaded on start"| maya
+    maya <-->|"real state"| db[("maya.db<br/>bookings · orders · rentals")]
 ```
 
 ## Install
