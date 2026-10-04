@@ -19,21 +19,25 @@ import sqlite3
 import threading
 from pathlib import Path
 
-def _repo_root() -> Path:
-    """The nearest ancestor directory with a pyproject.toml.
+def _default_db_path() -> Path:
+    """maya.db at the repo root when running from a clone, else in the
+    working directory.
 
-    Walking up to find the marker, rather than hardcoding a parent count,
-    means this keeps working if this file ever moves to a different depth.
+    The repo root is the nearest ancestor holding both pyproject.toml and
+    src/maya -- walking up for markers rather than hardcoding a parent count
+    keeps this working if the file moves, and requiring src/maya stops a
+    copy installed inside someone else's project from claiming *that*
+    project's root. An installed package has no repo root at all, so it
+    falls back to wherever the server is started.
     """
     for candidate in Path(__file__).resolve().parents:
-        if (candidate / "pyproject.toml").exists():
-            return candidate
-    raise RuntimeError("Could not find repo root (no pyproject.toml in any parent directory).")
+        if (candidate / "pyproject.toml").exists() and (candidate / "src" / "maya").is_dir():
+            return candidate / "maya.db"
+    return Path.cwd() / "maya.db"
 
 
-#: MAYA_DB_PATH overrides the location -- the Docker image points it at a
-#: volume, and an installed (non-editable) package has no repo root to find.
-DB_PATH = Path(os.environ["MAYA_DB_PATH"]) if "MAYA_DB_PATH" in os.environ else _repo_root() / "maya.db"
+#: MAYA_DB_PATH overrides the location -- the Docker image points it at a volume.
+DB_PATH = Path(os.environ["MAYA_DB_PATH"]) if "MAYA_DB_PATH" in os.environ else _default_db_path()
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
 #: Column name -> converter, applied when a CSV cell isn't already a string.
