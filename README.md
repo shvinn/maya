@@ -57,6 +57,16 @@ cd maya
 uv sync
 ```
 
+Or run it straight from GitHub without cloning:
+
+```bash
+uvx --from git+https://github.com/shvinn/maya maya serve --domain all
+```
+
+Bookings, orders and rentals are kept in `maya.db` — at the repo root when
+running from a clone, otherwise in the folder you start the server from. Set
+`MAYA_DB_PATH` to put it somewhere else.
+
 ## Usage
 
 Each domain is its own MCP server. Run one over HTTP:
