@@ -1,0 +1,15 @@
+# docker compose up -- every domain on http://localhost:6292/<domain>/mcp,
+# with bookings kept in the maya-data volume across restarts.
+services:
+  maya:
+    image: ghcr.io/shvinn/maya:latest
+    build: .
+    ports:
+      # Loopback only: the MCP server has no authentication.
+      - "127.0.0.1:6292:6292"
+    volumes:
+      - maya-data:/data
+    restart: unless-stopped
+
+volumes:
+  maya-data:

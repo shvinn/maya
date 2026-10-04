@@ -49,6 +49,7 @@ cd maya
 uv sync                  # install, including dev extras
 uv run pytest            # tests
 uv run maya serve        # MCP over HTTP on :6292
+docker build -t maya .   # the Docker image, as CI publishes it
 ```
 
 Code style: standard library first, type hints throughout, docstrings that

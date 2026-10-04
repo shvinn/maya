@@ -14,6 +14,7 @@ cleared except by an explicit ``reset_world()`` call.
 from __future__ import annotations
 
 import csv
+import os
 import sqlite3
 import threading
 from pathlib import Path
@@ -30,7 +31,9 @@ def _repo_root() -> Path:
     raise RuntimeError("Could not find repo root (no pyproject.toml in any parent directory).")
 
 
-DB_PATH = _repo_root() / "maya.db"
+#: MAYA_DB_PATH overrides the location -- the Docker image points it at a
+#: volume, and an installed (non-editable) package has no repo root to find.
+DB_PATH = Path(os.environ["MAYA_DB_PATH"]) if "MAYA_DB_PATH" in os.environ else _repo_root() / "maya.db"
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
 #: Column name -> converter, applied when a CSV cell isn't already a string.
