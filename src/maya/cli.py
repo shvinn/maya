@@ -7,14 +7,15 @@ Two ways to run an MCP server:
   uv run maya mcp delivery      same, for the delivery domain
   uv run maya mcp hotels        same, for the hotels domain
   uv run maya mcp cars          same, for the car rental domain
+  uv run maya mcp events        same, for the events domain
   uv run maya serve             HTTP transport on :6292, one domain
                                  (flights by default; --domain delivery,
-                                 hotels or cars for the others)
+                                 hotels, cars or events for the others)
   uv run maya serve --domain all
                                  HTTP transport on :6292, every domain at
                                  once -- each still its own MCP endpoint at
                                  its own path (/flights/mcp, /delivery/mcp,
-                                 /hotels/mcp, /cars/mcp),
+                                 /hotels/mcp, /cars/mcp, /events/mcp),
                                  not a merged tool list. See
                                  mcp_tools.combined_app for what this is and
                                  is not.

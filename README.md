@@ -9,8 +9,8 @@
 ## Overview
 
 Maya is an API simulator for AI agents: a fictional world of everyday
-services — flights, hotels, car rental and food delivery — exposed as MCP
-tools and running locally. Four domains exist today:
+services — flights, hotels, car rental, food delivery and events — exposed as MCP
+tools and running locally. Five domains exist today:
 
 - **Flights** — search, book, retrieve and cancel flights on a fictional
   airline network, direct or with one stop. Seats deplete for real, fares
@@ -28,6 +28,9 @@ tools and running locally. Four domains exist today:
 - **Cars** — rent a car from the one desk at Aira International, same-day
   included. See
   [`src/maya/simulations/cars/README.md`](src/maya/simulations/cars/README.md).
+- **Events** — comedy, concerts, lectures, theatre, family shows, films and
+  workshops at venues across Aira. Popular shows sell out; some are 18+. See
+  [`src/maya/simulations/events/README.md`](src/maya/simulations/events/README.md).
 
 Each domain has its own bookings/orders that persist across restarts
 (SQLite) — so failures (sold-out flights or rooms, non-refundable fares,
@@ -43,10 +46,11 @@ flowchart LR
         delivery["Delivery"]
         hotels["Hotels"]
         cars["Cars"]
+        events["Events"]
     end
 
-    csv["World data (CSV)<br/>airports · vendors · hotels · fleet"] -.->|"loaded on start"| maya
-    maya <-->|"real state"| db[("maya.db<br/>bookings · orders · rentals")]
+    csv["World data (CSV)<br/>airports · vendors · hotels · fleet · shows"] -.->|"loaded on start"| maya
+    maya <-->|"real state"| db[("maya.db<br/>bookings · orders · rentals · tickets")]
 ```
 
 ## Install
@@ -81,6 +85,7 @@ uv run maya serve --domain all        # all at once, one port, one path each:
                                        #   http://localhost:6292/delivery/mcp
                                        #   http://localhost:6292/hotels/mcp
                                        #   http://localhost:6292/cars/mcp
+                                       #   http://localhost:6292/events/mcp
 ```
 
 Or as stdio servers, e.g. for Claude Desktop / Claude Code:
@@ -109,6 +114,7 @@ docker run -p 127.0.0.1:6292:6292 -v maya-data:/data ghcr.io/shvinn/maya
                                        #   http://localhost:6292/delivery/mcp
                                        #   http://localhost:6292/hotels/mcp
                                        #   http://localhost:6292/cars/mcp
+                                       #   http://localhost:6292/events/mcp
 docker run -p 127.0.0.1:6292:6292 -v maya-data:/data ghcr.io/shvinn/maya serve --domain hotels
 docker compose up                      # same as the first, from a clone
 ```

@@ -24,6 +24,7 @@ os.environ["MAYA_DB_PATH"] = str(Path(tempfile.mkdtemp(prefix="maya-tests-")) / 
 
 from maya.simulations.cars import fleet, rentals  # noqa: E402
 from maya.simulations.delivery import orders  # noqa: E402
+from maya.simulations.events import tickets  # noqa: E402
 from maya.simulations.flights import bookings as flight_bookings  # noqa: E402
 from maya.simulations.hotels import bookings as hotel_bookings  # noqa: E402
 
@@ -31,7 +32,7 @@ from maya.simulations.hotels import bookings as hotel_bookings  # noqa: E402
 NOW = datetime(2030, 3, 4, 9, 0)
 
 #: Every module that reads the clock (all via ``datetime.now()``).
-_CLOCK_MODULES = (fleet, rentals, orders, flight_bookings, hotel_bookings)
+_CLOCK_MODULES = (fleet, rentals, orders, tickets, flight_bookings, hotel_bookings)
 
 
 class Clock:
@@ -61,5 +62,5 @@ def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
 @pytest.fixture(autouse=True)
 def fresh_world() -> None:
     """Every test starts with no bookings, orders or rentals in any domain."""
-    for module in (flight_bookings, hotel_bookings, rentals, orders):
+    for module in (flight_bookings, hotel_bookings, rentals, orders, tickets):
         module.reset()

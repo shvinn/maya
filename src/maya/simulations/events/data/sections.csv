@@ -1,0 +1,18 @@
+section_id,venue,name,capacity,price_factor
+LNT-TBL,LNT,Front Tables,24,1.5
+LNT-GA,LNT,General Admission,96,1.0
+ACH-STL,ACH,Stalls,700,1.0
+ACH-CIR,ACH,Circle,350,0.7
+ACH-BOX,ACH,Boxes,40,2.0
+HAM-SEAT,HAM,Seated,600,1.4
+HAM-LAWN,HAM,Lawn,1800,1.0
+UGH-GA,UGH,General Admission,320,1.0
+RVP-STL,RVP,Stalls,260,1.0
+RVP-BAL,RVP,Balcony,140,0.75
+CRA-FLR,CRA,Floor,3000,1.0
+CRA-TIER,CRA,Tiers,6000,0.8
+CRA-VIP,CRA,VIP,100,3.0
+LDF-GA,LDF,General Admission,200,1.0
+EPH-STD,EPH,Standard,180,1.0
+EPH-REC,EPH,Recliners,40,1.6
+OCH-WB,OCH,Workbench,12,1.0

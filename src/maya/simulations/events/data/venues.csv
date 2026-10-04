@@ -1,0 +1,10 @@
+code,name,zone,venue_type
+LNT,The Lantern Room,AIR-MKT,comedy_club
+ACH,Aira Concert Hall,AIR-CAP,concert_hall
+HAM,Harbour Amphitheatre,AIR-PRT,amphitheatre
+UGH,University Great Hall,AIR-OLD,lecture_hall
+RVP,Riverside Playhouse,AIR-RIV,theatre
+CRA,Carnival Row Arena,AIR-CRN,arena
+LDF,Ledger Forum,AIR-FIN,conference_hall
+EPH,The Embassy Picturehouse,AIR-EMB,cinema
+OCH,Old Aira Craft House,AIR-OLD,workshop
