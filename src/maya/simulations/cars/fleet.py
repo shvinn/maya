@@ -19,8 +19,9 @@ model, not a specific car -- there are no plates or VINs.
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import NamedTuple
+
+from maya.world import clock
 
 from . import db
 
@@ -46,7 +47,7 @@ class Car(NamedTuple):
 
     @property
     def year(self) -> int:
-        return datetime.now().year - self.model_age_years
+        return clock.now().year - self.model_age_years
 
     def label(self) -> str:
         return f"{self.year} {self.make} {self.model}"

@@ -9,9 +9,12 @@ from __future__ import annotations
 
 from mcp.server.mcpserver import MCPServer
 
+from maya.world.mcp_tools import add_time_tool
+
 from . import catalog, tickets
 
 mcp = MCPServer("aira-events")
+add_time_tool(mcp)
 
 
 def _error(code: str, message: str, hint: str | None = None) -> dict:

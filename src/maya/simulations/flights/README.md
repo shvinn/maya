@@ -54,6 +54,8 @@ Availability and fare both depend on how close to departure it is and how
 full the flight already is (a simulated background demand curve). Calling
 `flights_search_flights` for the same route/date minutes apart can
 legitimately return different numbers — that's not a bug to work around.
+"Now" is Maya time (MYT, UTC−08:00), not your local time, and it may be
+running faster than real time — `world_get_time` says what it is.
 
 ## Refund rules are per-airline, not per-fare-tier
 

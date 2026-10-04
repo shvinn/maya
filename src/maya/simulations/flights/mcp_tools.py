@@ -19,9 +19,12 @@ from datetime import date as Date
 
 from mcp.server.mcpserver import MCPServer
 
+from maya.world.mcp_tools import add_time_tool
+
 from . import airports, bookings, connections, schedule, search
 
 mcp = MCPServer("maya-flights")
+add_time_tool(mcp)
 
 
 def _error(code: str, message: str, hint: str | None = None) -> dict:

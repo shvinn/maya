@@ -40,6 +40,7 @@ import json
 import random
 from datetime import date, datetime, time, timedelta
 
+from maya.world import clock
 from maya.world.geography import maps
 
 from . import db, hotels
@@ -138,7 +139,7 @@ def parse_stay(check_in: str, check_out: str) -> tuple[date, date, list[date]]:
     to but not including check_out."""
     start = _parse_date(check_in, "check_in")
     end = _parse_date(check_out, "check_out")
-    today = datetime.now().date()
+    today = clock.now().date()
     if start < today:
         raise InvalidDates(f"check_in {start.isoformat()} is in the past.")
     if end <= start:
@@ -157,7 +158,7 @@ def _check_in_at(night: date) -> datetime:
 
 def _background_sold(room: RoomType, night: date) -> int:
     """Rooms other guests have taken, purely a function of time to the night."""
-    days_left = (_check_in_at(night) - datetime.now()) / timedelta(days=1)
+    days_left = (_check_in_at(night) - clock.now()) / timedelta(days=1)
     ramp = max(0.0, min(1.0, 1 - days_left / BACKGROUND_DEMAND_HORIZON_DAYS))
     pct_sold = ramp * BACKGROUND_DEMAND_MAX_OCCUPANCY
     sold = min(round(room.rooms_total * pct_sold), room.rooms_total - BACKGROUND_DEMAND_FLOOR_ROOMS)
@@ -242,7 +243,7 @@ def _status(booking: dict) -> str:
     value that's actually stored, as a terminal override."""
     if booking["cancelled"]:
         return "CANCELLED"
-    now = datetime.now()
+    now = clock.now()
     if now < datetime.fromisoformat(booking["check_in_at"]):
         return "CONFIRMED"
     if now < datetime.fromisoformat(booking["check_out_at"]):
@@ -306,7 +307,7 @@ def book(
         "total_price": {"amount": q["total"], "currency": CURRENCY},
         "refundable": hotel.refundable,
         "cancellation_policy": hotel.policy_text(),
-        "booked_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "booked_at": clock.now().strftime("%Y-%m-%d %H:%M"),
     }
     _save_booking(booking)
     return _with_live_status(booking)
@@ -343,7 +344,7 @@ def cancel(reference: str) -> dict:
             hotel.policy_text() if hotel else f"{booking['hotel_name']} bookings are non-refundable."
         )
 
-    hours_left = (datetime.fromisoformat(booking["check_in_at"]) - datetime.now()) / timedelta(hours=1)
+    hours_left = (datetime.fromisoformat(booking["check_in_at"]) - clock.now()) / timedelta(hours=1)
     if hours_left < hotel.cancel_cutoff_hours:
         raise TooLateToCancel(
             f"Booking {booking['booking_reference']} checks in in {max(hours_left, 0):.1f} "

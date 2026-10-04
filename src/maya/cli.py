@@ -8,14 +8,16 @@ Two ways to run an MCP server:
   uv run maya mcp hotels        same, for the hotels domain
   uv run maya mcp cars          same, for the car rental domain
   uv run maya mcp events        same, for the events domain
+  uv run maya mcp world         same, for the world clock's controls
   uv run maya serve             HTTP transport on :6292, one domain
                                  (flights by default; --domain delivery,
-                                 hotels, cars or events for the others)
+                                 hotels, cars, events or world for the others)
   uv run maya serve --domain all
                                  HTTP transport on :6292, every domain at
                                  once -- each still its own MCP endpoint at
                                  its own path (/flights/mcp, /delivery/mcp,
-                                 /hotels/mcp, /cars/mcp, /events/mcp),
+                                 /hotels/mcp, /cars/mcp, /events/mcp,
+                                 /world/mcp),
                                  not a merged tool list. See
                                  mcp_tools.combined_app for what this is and
                                  is not.
@@ -23,6 +25,9 @@ Two ways to run an MCP server:
 ``serve`` binds 127.0.0.1 unless told otherwise (``--host``, or the
 ``MAYA_HOST`` environment variable -- the Docker image sets it to 0.0.0.0 so
 the server is reachable from outside the container).
+
+``MAYA_TIME_SCALE`` (e.g. 60 = one Maya hour per real minute) is applied to
+the world clock when a server starts; see maya.world.clock.
 
 There is no REST/OpenAPI surface yet -- only MCP is implemented. See
 DECISIONS.md and the README for what's real versus what's still aspirational.
@@ -35,6 +40,7 @@ import os
 import sys
 
 from .mcp_tools import SERVERS as _SERVERS
+from .world import clock
 from .mcp_tools import combined_app
 
 
@@ -53,6 +59,11 @@ def main() -> None:
     mcp_cmd.add_argument("domain", choices=list(_SERVERS))
 
     args = parser.parse_args()
+
+    try:
+        clock.apply_env_scale()
+    except clock.ClockError as e:
+        parser.error(str(e))
 
     if args.command == "serve":
         if args.domain == "all":

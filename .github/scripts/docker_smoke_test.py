@@ -22,7 +22,9 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
 
-DOMAINS = ("flights", "delivery", "hotels", "cars", "events")
+DOMAINS = ("flights", "delivery", "hotels", "cars", "events", "world")
+#: Every server also carries the world clock's read-only tool.
+SHARED_TOOLS = {"world_get_time"}
 STARTUP_TIMEOUT_SECONDS = 30
 
 
@@ -42,8 +44,8 @@ async def list_tools_stdio(domain: str) -> list[str]:
 
 
 def check(label: str, domain: str, names: list[str]) -> bool:
-    wrong = [n for n in names if not n.startswith(f"{domain}_")]
-    ok = bool(names) and not wrong
+    wrong = [n for n in names if not n.startswith(f"{domain}_") and n not in SHARED_TOOLS]
+    ok = bool(names) and not wrong and SHARED_TOOLS <= set(names)
     detail = f"{len(names)} tools" if ok else f"{len(names)} tools, unexpected: {wrong or 'none listed'}"
     print(f"{'PASS' if ok else 'FAIL'}  {label:<6} {domain:<9} {detail}")
     return ok

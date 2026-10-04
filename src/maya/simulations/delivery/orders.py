@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta
 
+from maya.world import clock
 from maya.world.geography import maps
 
 from . import db, vendors
@@ -82,7 +83,7 @@ def _status(order: dict) -> str:
     if order["cancelled"]:
         return "CANCELLED"
     placed_at = datetime.strptime(order["placed_at"], "%Y-%m-%d %H:%M:%S")
-    elapsed_minutes = (datetime.now() - placed_at) / timedelta(minutes=1)
+    elapsed_minutes = (clock.now() - placed_at) / timedelta(minutes=1)
     if elapsed_minutes < order["prep_minutes"]:
         return "PREPARING"
     if elapsed_minutes < order["prep_minutes"] + order["courier_minutes"]:
@@ -144,7 +145,7 @@ def place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phone
         "prep_minutes": vendor.prep_minutes,
         "courier_minutes": courier_minutes,
         "eta_minutes": vendor.prep_minutes + courier_minutes,
-        "placed_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "placed_at": clock.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
     _save_order(order)
     return _with_live_status(order)

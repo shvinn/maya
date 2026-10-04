@@ -36,6 +36,8 @@ import math
 import random
 from datetime import date, datetime, time, timedelta
 
+from maya.world import clock
+
 from . import db, fleet
 from .fleet import Car
 
@@ -130,7 +132,7 @@ def parse_rental(pickup_at: str, dropoff_at: str) -> tuple[datetime, datetime, l
     """Validate a rental window and return (pickup, dropoff, rental days)."""
     pickup = _parse_datetime(pickup_at, "pickup_at")
     dropoff = _parse_datetime(dropoff_at, "dropoff_at")
-    now = datetime.now().replace(second=0, microsecond=0)
+    now = clock.now().replace(second=0, microsecond=0)
     if pickup < now:
         raise InvalidDates(f"pickup_at {pickup:%Y-%m-%d %H:%M} is in the past.")
     if dropoff <= pickup:
@@ -146,7 +148,7 @@ def parse_rental(pickup_at: str, dropoff_at: str) -> tuple[datetime, datetime, l
 
 def _background_out(car: Car, day: date) -> int:
     """Cars other renters have taken, purely a function of time to the day."""
-    days_left = (datetime.combine(day, time(12, 0)) - datetime.now()) / timedelta(days=1)
+    days_left = (datetime.combine(day, time(12, 0)) - clock.now()) / timedelta(days=1)
     ramp = max(0.0, min(1.0, 1 - days_left / BACKGROUND_DEMAND_HORIZON_DAYS))
     out = round(car.fleet_size * ramp * BACKGROUND_DEMAND_MAX_OCCUPANCY)
     return max(0, min(out, car.fleet_size - BACKGROUND_DEMAND_FLOOR_CARS))
@@ -212,7 +214,7 @@ def _status(rental: dict) -> str:
     value that's actually stored, as a terminal override."""
     if rental["cancelled"]:
         return "CANCELLED"
-    now = datetime.now()
+    now = clock.now()
     if now < datetime.fromisoformat(rental["pickup_at"]):
         return "RESERVED"
     if now < datetime.fromisoformat(rental["dropoff_at"]):
@@ -269,7 +271,7 @@ def book(
         "daily_prices": q["daily_prices"],
         "total_price": {"amount": q["total"], "currency": CURRENCY},
         "cancellation_policy": "Free cancellation any time before pickup; not possible after.",
-        "booked_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "booked_at": clock.now().strftime("%Y-%m-%d %H:%M"),
     }
     _save_rental(rental)
     return _with_live_status(rental)
