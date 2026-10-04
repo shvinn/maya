@@ -65,6 +65,13 @@ docker run --rm --network smoke -v "$PWD/.github/scripts:/smoke:ro" \
 docker rm -f maya && docker network rm smoke
 ```
 
+Tests live in `tests/`, one file per domain, and run on Python 3.10 and 3.13
+in CI. Two things make them deterministic (see `tests/conftest.py`): every
+run uses a throwaway database via `MAYA_DB_PATH`, never your `maya.db`, and
+the clock is frozen at a fixed Monday morning, moved only by the `clock`
+fixture. A test for a time-based rule should set the clock, not depend on
+when it runs.
+
 Code style: standard library first, type hints throughout, docstrings that
 explain *why*. Comments earn their place by explaining a decision, not by
 narrating the next line.
