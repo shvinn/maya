@@ -7,12 +7,9 @@ what the simulation actually models, not how to run it.
 
 ## Booking is one step, not search → hold → pay
 
-`flights_book_flight` confirms immediately. There's a fuller
-search-then-hold-then-pay lifecycle documented in the project's fuller
-design record (`.docs/FLIGHTS.md`, gitignored/local-only — see
-`CONTRIBUTING.md`), including tools like `flights_get_offer` and a separate
-pay step — none of that exists in the code yet. Don't assume a held offer,
-an expiry window, or a separate payment call are things you can rely on.
+`flights_book_flight` confirms immediately. There is no
+search-then-hold-then-pay lifecycle: no held offer, no expiry window, and no
+separate payment call to rely on.
 
 ## Direct or one stop — never more
 

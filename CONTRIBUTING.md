@@ -25,6 +25,12 @@ Standard `src/` layout: `src/maya/` is the one installable package.
   `world` MCP server. **Always read the time with `maya.world.clock.now()`,
   never `datetime.now()`** — it's Maya time (MYT), and it can be scaled or
   skipped; a test fails if a domain reads the host clock.
+- `src/maya/storage.py` decides where `maya.db` lives and provides
+  `transaction()`. **A booking's checks and writes go in one transaction**
+  (each domain's public `book`/`cancel` wraps a private `_book`/`_cancel` in
+  it), so concurrent requests can't oversell or issue the same reference.
+  Report refusals with `maya.tool_errors.tool_error`, so they reach clients
+  as MCP tool errors.
 - Reference data (airports and the weekly schedule, vendors and menus,
   hotels and room types, the rental fleet, venues and event series) lives in each domain's
   `data/*.csv` — human-editable, reloaded into SQLite on every start. Edit a

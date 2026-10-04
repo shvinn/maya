@@ -5,8 +5,8 @@ class of pointless ambiguity while keeping multi-city planning interesting.
 The source of truth is ``data/airports.csv``; it is loaded into SQLite on
 init and read from there, so editing that file changes the world on next run.
 
-Geography (coordinates, runway length, country, flavour text) lives in
-.docs/WORLD.md for now, not here -- see that doc for the fuller picture.
+Only code, city and name are modelled; there are no coordinates, runway
+lengths or other geography in the code yet.
 """
 
 from __future__ import annotations

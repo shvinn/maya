@@ -29,8 +29,8 @@ the server is reachable from outside the container).
 ``MAYA_TIME_SCALE`` (e.g. 60 = one Maya hour per real minute) is applied to
 the world clock when a server starts; see maya.world.clock.
 
-There is no REST/OpenAPI surface yet -- only MCP is implemented. See
-DECISIONS.md and the README for what's real versus what's still aspirational.
+There is no REST/OpenAPI surface yet -- only MCP is implemented. See the
+README for what's real versus what's still aspirational.
 """
 
 from __future__ import annotations
