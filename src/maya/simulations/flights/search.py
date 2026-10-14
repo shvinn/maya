@@ -17,7 +17,7 @@ from typing import Iterable
 
 from . import bookings, connections
 from .airports import resolve as resolve_airport
-from .schedule import CURRENCY, ScheduledFlight, flights_on
+from .schedule import AIRLINES, CURRENCY, ScheduledFlight, flights_on
 
 SORTS = ("price", "duration", "departure")
 
@@ -27,6 +27,27 @@ class InvalidRequest(Exception):
 
     code = "invalid_request"
     hint = "Call flights_search_airports to find a valid code or city name."
+
+
+class UnknownAirline(InvalidRequest):
+    hint = "Use an airline's code or name: " + ", ".join(f"{a.code} ({a.name})" for a in AIRLINES.values()) + "."
+
+
+def resolve_airline(value: str) -> str:
+    """An airline code from its code or name, the way airports resolve: an
+    exact code or name in any case, else a partial name only if one airline
+    fits. Anything else is refused rather than filtering to nothing -- an
+    empty result would read as "no flights"."""
+    needle = value.strip().lower()
+    for airline in AIRLINES.values():
+        if needle in (airline.code.lower(), airline.name.lower()):
+            return airline.code
+    matches = [a for a in AIRLINES.values() if needle in a.name.lower()]
+    if len(matches) == 1:
+        return matches[0].code
+    if matches:
+        raise UnknownAirline(f"{value!r} matches more than one airline: {', '.join(a.name for a in matches)}.")
+    raise UnknownAirline(f"Unknown airline {value!r}.")
 
 
 def _leg(flight: ScheduledFlight) -> dict:
@@ -109,11 +130,14 @@ def search(
         ]
 
     if airline:
-        wanted = airline.strip().upper()
+        wanted = resolve_airline(airline)
         options = [o for o in options if all(leg["airline"] == wanted for leg in o["legs"])]
+    scheduled = len(options)
     options = [o for o in options if o["seats_available"] >= passengers]
+    full = scheduled - len(options)
     if max_price is not None:
         options = [o for o in options if o["total_price"]["amount"] <= max_price]
+    over_price = scheduled - full - len(options)
 
     keys = {
         "price": lambda o: (
@@ -133,23 +157,48 @@ def search(
         "count": len(options[:limit]),
         "total_found": len(options),
         "options": options[:limit],
-        "summary": _summarise(origin, destination, day, options, max_stops),
+        "not_enough_seats": full,
+        "over_max_price": over_price,
+        "summary": _summarise(
+            origin, destination, day, options, max_stops, passengers, full, over_price,
+            AIRLINES[wanted].name if airline else None,
+        ),
     }
 
 
 def _summarise(
-    origin: str, destination: str, day: Date, options: Iterable[dict], max_stops: int
+    origin: str, destination: str, day: Date, options: Iterable[dict], max_stops: int,
+    passengers: int = 1, full: int = 0, over_price: int = 0, airline: str | None = None,
 ) -> str:
-    """Say why a result is empty, so an agent does not treat it as a failure."""
+    """Say what was found and, above all, why anything wasn't -- full
+    flights and price limits included -- so an agent doesn't mistake a full
+    flight for a route that doesn't fly."""
     options = list(options)
+    left_out = []
+    if full:
+        left_out.append(f"{full} without {passengers} seat(s) left")
+    if over_price:
+        left_out.append(f"{over_price} over max_price")
     if options:
         direct = sum(1 for o in options if o["stops"] == 0)
         return (
             f"{len(options)} option(s) found for {origin}-{destination} on "
             f"{day.isoformat()}: {direct} direct, {len(options) - direct} with one stop."
+            + (f" Left out: {' and '.join(left_out)}." if left_out else "")
+        )
+    if left_out:
+        return (
+            f"Flights do operate {origin}-{destination} on {day.isoformat()}, but none fits: "
+            f"{' and '.join(left_out)}. The route itself is fine; try another date, fewer "
+            "passengers or a higher max_price."
         )
     weekday = day.strftime("%A")
     kind = "direct or one-stop" if max_stops >= 1 else "direct"
+    if airline:
+        return (
+            f"No {kind} {airline} flights {origin}-{destination} on {weekday} {day.isoformat()}. "
+            "Other airlines may fly it: search again without the airline filter."
+        )
     return (
         f"No {kind} flights {origin}-{destination} on {weekday} {day.isoformat()}. "
         "Maya's timetable is fixed and weekly, connections allow one stop at most, "

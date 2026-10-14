@@ -163,3 +163,41 @@ def test_booking_charges_and_refunds_the_discounted_fare():
     assert booking["connection_discount_per_passenger"]["amount"] > 0
     assert booking["total_price"]["amount"] == 2 * booking["price_per_passenger"]["amount"]
     assert t.flights_cancel_booking(booking["booking_reference"])["refund"] == booking["total_price"]
+
+
+# --- search filters and empty results ------------------------------------------
+
+
+@pytest.mark.parametrize("airline", ["PF", "pf", "Puffin Air", "puffin air", "Puffin"])
+def test_airline_filter_takes_a_code_or_a_name(airline):
+    result = t.flights_search_flights("Aira", "Zahrun", DAY, airline=airline, max_stops=0)
+    assert result["options"] and all(o["airline"] == "PF" for o in result["options"])
+
+
+@pytest.mark.parametrize("airline, message", [("Air", "more than one airline"), ("Pelican Air", "Unknown airline")])
+def test_an_ambiguous_or_unknown_airline_is_refused_not_filtered_to_nothing(airline, message):
+    error = error_of(t.flights_search_flights("AIR", "ZHR", DAY, airline=airline))
+    assert error["code"] == "invalid_request"
+    assert message in error["message"]
+    assert "PF (Puffin Air)" in error["hint"]
+
+
+def test_full_flights_are_counted_and_explained_not_reported_as_no_service():
+    today = NOW.date().isoformat()  # flights leaving today have at most a few seats left
+    result = t.flights_search_flights("AIR", "ZHR", today, passengers=5, max_stops=0)
+    assert result["options"] == []
+    assert result["not_enough_seats"] > 0
+    assert "Flights do operate" in result["summary"] and "5 seat(s)" in result["summary"]
+
+
+def test_flights_over_max_price_are_counted():
+    result = t.flights_search_flights("AIR", "ZHR", DAY, max_price=100, max_stops=0)
+    assert all(o["airline"] == "PF" for o in result["options"])
+    assert result["over_max_price"] > 0
+    assert "over max_price" in result["summary"]
+
+
+def test_an_airline_that_does_not_fly_the_route_is_named_in_the_summary():
+    result = t.flights_search_flights("MEG", "VNP", DAY, airline="Puffin Air")
+    assert result["options"] == []
+    assert "Puffin Air" in result["summary"] and "without the airline filter" in result["summary"]
