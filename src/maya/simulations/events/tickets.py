@@ -1,7 +1,7 @@
 """Event tickets, persisted in SQLite.
 
 A booking and the tickets sold per performance and section survive a
-restart; ``reset()`` (the ``events_reset_bookings`` tool) empties them.
+restart; ``reset()`` empties them, as part of a world reset (see maya.reset).
 Booking is a single step, like every other domain: search, book, confirmed.
 
 Inventory is per section of one performance. Other buyers take tickets on
@@ -408,7 +408,7 @@ def cancel(reference: str) -> dict:
 
 
 def reset() -> int:
-    """Empty all bookings and tickets sold. The ``events_reset_bookings`` tool.
+    """Empty all bookings and tickets sold. Part of a world reset (see maya.reset).
 
     Returns the number of bookings cleared.
     """

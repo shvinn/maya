@@ -57,7 +57,7 @@ hostel and the budget lodge) are non-refundable and always fail with
 check-out (11:00 on the check-out date), then `CHECKED_OUT`. `CANCELLED` is
 the only stored status. A booking made today for tonight may already show
 `CHECKED_IN`. All times are Maya time (MYT, UTC−08:00), which
-the `world` server can speed up or skip ahead — see "Maya time" in the repo
+the `world` server can move ahead — see "Maya time" in the repo
 README.
 
 ## Dates

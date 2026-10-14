@@ -3,8 +3,8 @@
 A booking and the seats sold per flight-date survive a restart, unlike the
 reference data in ``schedule.py`` and ``airports.py`` -- this is the one part
 of the world that is actually state rather than a fact re-derived from a CSV
-file. ``reset()`` (the ``flights_reset_bookings`` tool) is the explicit way
-to empty it back out, which is also what tests use between runs.
+file. ``reset()`` is the explicit way to empty it back out, as part of a
+world reset (see maya.reset), which is also what tests use between runs.
 
 Booking is a single step. There is no held-then-paid flow and no priced offer to
 expire: you search, you book, you are confirmed. A booking holds one flight, or
@@ -306,7 +306,7 @@ def cancel(reference: str) -> dict:
 
 
 def reset() -> int:
-    """Empty all bookings and seat counts. The ``flights_reset_bookings`` tool.
+    """Empty all bookings and seat counts. Part of a world reset (see maya.reset).
 
     Returns the number of bookings cleared.
     """

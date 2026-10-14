@@ -25,11 +25,7 @@ from mcp_types import CallToolResult
 
 os.environ["MAYA_DB_PATH"] = str(Path(tempfile.mkdtemp(prefix="maya-tests-")) / "maya.db")
 
-from maya.simulations.cars import rentals  # noqa: E402
-from maya.simulations.delivery import orders  # noqa: E402
-from maya.simulations.events import tickets  # noqa: E402
-from maya.simulations.flights import bookings as flight_bookings  # noqa: E402
-from maya.simulations.hotels import bookings as hotel_bookings  # noqa: E402
+from maya.reset import reset_world  # noqa: E402
 from maya.world import clock as world_clock  # noqa: E402
 
 #: Monday 4 March 2030, 09:00 -- the frozen "now" every test starts from.
@@ -65,9 +61,7 @@ def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
 def fresh_world() -> None:
     """Every test starts with no bookings, orders or rentals in any domain,
     and an unmodified world clock."""
-    for module in (flight_bookings, hotel_bookings, rentals, orders, tickets):
-        module.reset()
-    world_clock.reset()
+    reset_world()
 
 
 def error_of(result) -> dict | None:

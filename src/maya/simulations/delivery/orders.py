@@ -202,7 +202,7 @@ def cancel(order_id: str) -> dict:
 
 
 def reset() -> int:
-    """Empty all orders. The ``delivery_reset_orders`` tool.
+    """Empty all orders. Part of a world reset (see maya.reset).
 
     Returns the number of orders cleared.
     """

@@ -48,7 +48,7 @@ take those last cars. Then it's `sold_out`. The price is locked once booked.
 
 `RESERVED` until pickup, `PICKED_UP` until drop-off, then `RETURNED`.
 `CANCELLED` is the only stored status. All times are Maya time (MYT, UTC−08:00), which
-the `world` server can speed up or skip ahead — see "Maya time" in the repo
+the `world` server can move ahead — see "Maya time" in the repo
 README.
 
 ## No payment, no extras

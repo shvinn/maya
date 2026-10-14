@@ -182,14 +182,3 @@ def flights_cancel_booking(booking_reference: str) -> dict:
         return bookings.cancel(booking_reference)
     except bookings.BookingError as e:
         return _error(e.code, str(e), e.hint)
-
-
-@mcp.tool()
-def flights_reset_bookings() -> dict:
-    """Clear every booking and seat count for this database.
-
-    Reference data (airports, airlines, aircraft, the schedule) is
-    untouched -- it isn't state, it's world content.
-    """
-    cleared = bookings.reset()
-    return {"cleared": cleared}

@@ -23,8 +23,8 @@ Standard `src/` layout: `src/maya/` is the one installable package.
 - `src/maya/world/` is shared, domain-agnostic world data and machinery —
   Aira's zones and road graph, and the world clock (`clock.py`) with its
   `world` MCP server. **Always read the time with `maya.world.clock.now()`,
-  never `datetime.now()`** — it's Maya time (MYT), and it can be scaled or
-  skipped; a test fails if a domain reads the host clock.
+  never `datetime.now()`** — it's Maya time (MYT), and it can be moved
+  ahead; a test fails if a domain reads the host clock.
 - `src/maya/storage.py` decides where `maya.db` lives and provides
   `transaction()`. **A booking's checks and writes go in one transaction**
   (each domain's public `book`/`cancel` wraps a private `_book`/`_cancel` in

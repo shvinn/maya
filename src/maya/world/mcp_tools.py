@@ -1,8 +1,8 @@
-"""MCP tools for Maya's world clock.
+"""MCP tools for Maya's world: its clock, and resetting it.
 
 The controls live on their own ``world`` server, meant for whoever runs the
 world (you, or a test harness) rather than the agent being tested -- so an
-agent can't skip past its own deadlines. Every domain server gets only the
+agent can't skip past its own deadlines or wipe the world. Every domain server gets only the
 read-only ``world_get_time``, via ``add_time_tool``, so an agent can always
 ask what time it is in Maya.
 """
@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from mcp.server.mcpserver import MCPServer
 
+from maya.reset import reset_world
 from maya.tool_errors import tool_error
 
 from . import clock
@@ -29,8 +30,7 @@ def add_time_tool(server: MCPServer) -> None:
         """The current time in Maya: Mayan Meridian Time (MYT, UTC-08:00).
 
         Every deadline, status and price in Maya runs on this clock, not your
-        local time -- and it may be running faster than real time
-        (``scale`` > 1) or frozen (``scale`` 0).
+        local time -- and it may have been moved ahead of the real date.
         """
         return clock.state()
 
@@ -41,15 +41,16 @@ add_time_tool(mcp)
 
 
 @mcp.tool()
-def world_set_time_scale(scale: float) -> dict:
-    """Set how fast Maya time runs against real time, from now on.
+def world_set_time(maya_time: str) -> dict:
+    """Move Maya time ahead to a given moment -- e.g. "2030-03-08 09:00" to
+    jump to just before a departure. ``maya_time`` is YYYY-MM-DD HH:MM in
+    Maya time (MYT); time keeps running at real speed from there.
 
-    1 = real time (the default), 60 = one Maya hour per real minute,
-    1440 = one Maya day per real minute, 0 = frozen. Maximum 10000. The
-    clock never jumps when the scale changes.
+    Time only moves forward; a moment at or before now fails with
+    invalid_time.
     """
     try:
-        return clock.set_scale(scale)
+        return clock.set_time(maya_time)
     except clock.ClockError as e:
         return _error(e)
 
@@ -60,7 +61,7 @@ def world_advance_time(minutes: float = 0, hours: float = 0, days: float = 0) ->
     arrive, or 2 days to reach a check-out.
 
     Time only moves forward; a zero or negative total fails with
-    invalid_duration. The scale is unchanged.
+    invalid_duration.
     """
     try:
         return clock.advance(minutes, hours, days)
@@ -69,11 +70,13 @@ def world_advance_time(minutes: float = 0, hours: float = 0, days: float = 0) ->
 
 
 @mcp.tool()
-def world_reset_time() -> dict:
-    """Return Maya to real time (in MYT) at 1:1.
+def world_reset() -> dict:
+    """Start the world over: empty every domain's bookings, orders, rentals
+    and tickets, and return Maya time to real time.
 
-    If time had been skipped ahead this steps backwards, so bookings made in
-    the skipped-ahead time may look like they're in the future -- reset the
-    domains' bookings too for a clean world.
+    The only way time goes backwards -- bookings and the clock reset
+    together, so nothing is left dated in a future that hasn't happened.
+    Reference data (airports, hotels, menus, shows) is untouched. Returns
+    how many records each domain had.
     """
-    return clock.reset()
+    return {"cleared": reset_world(), **clock.state()}

@@ -114,14 +114,3 @@ def cars_cancel_rental(reference: str) -> dict:
         return rentals.cancel(reference)
     except rentals.RentalError as e:
         return _error(e.code, str(e), e.hint)
-
-
-@mcp.tool()
-def cars_reset_rentals() -> dict:
-    """Clear every rental and the cars they held.
-
-    Reference data (the fleet) is untouched -- it isn't state, it's world
-    content.
-    """
-    cleared = rentals.reset()
-    return {"cleared": cleared}

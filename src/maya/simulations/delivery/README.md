@@ -46,7 +46,7 @@ was placed — it computes `PREPARING` → `OUT_FOR_DELIVERY` → `DELIVERED` fr
 elapsed Maya time against the vendor's prep time and the courier's travel
 time, every time you call it. Two calls a few minutes apart can legitimately
 show different statuses without anything else having happened. Maya time
-follows real time 1:1 by default; the `world` server can speed it up or skip
+follows real time by default; the `world` server can move it
 ahead (see "Maya time" in the repo README).
 
 ## Cancellation only works while still `PREPARING`

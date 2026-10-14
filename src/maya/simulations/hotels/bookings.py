@@ -1,8 +1,8 @@
 """Hotel bookings, persisted in SQLite.
 
 A booking and the rooms sold per room-type-night survive a restart -- the
-rest of the domain is reference data re-derived from CSV. ``reset()`` (the
-``hotels_reset_bookings`` tool) is the explicit way to empty it back out.
+rest of the domain is reference data re-derived from CSV. ``reset()`` is the
+explicit way to empty it back out, as part of a world reset (see maya.reset).
 
 Booking is a single step, same as flights and delivery: search, book,
 confirmed. No hold, no rate plan to choose, no payment call.
@@ -388,7 +388,7 @@ def cancel(reference: str) -> dict:
 
 
 def reset() -> int:
-    """Empty all bookings and rooms sold. The ``hotels_reset_bookings`` tool.
+    """Empty all bookings and rooms sold. Part of a world reset (see maya.reset).
 
     Returns the number of bookings cleared.
     """
