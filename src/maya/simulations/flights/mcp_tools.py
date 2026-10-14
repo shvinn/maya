@@ -66,12 +66,15 @@ def flights_search_flights(
     traveller needs somewhere to sleep at the connection airport, which the
     ticket doesn't include. Never more than one stop -- if a city pair has
     neither, there is no service. ``max_stops=0`` returns direct flights
-    only. ``airline`` keeps options where every leg is that airline. Seats
+    only. ``airline`` (a code like "PF" or a name like "Puffin Air") keeps
+    options where every leg is that airline; an unknown airline is an error.
+    ``not_enough_seats`` and ``over_max_price`` count flights that operate
+    but were left out, and ``summary`` says why a result is empty. Seats
     and prices are computed live, so a search minutes apart can return
     different numbers. A connection on one airline costs 20% less than its
     legs bought separately (``connection_discount_per_passenger``); across
     two airlines it's the plain sum. Its ``seats_available`` is the fuller
-    leg's. An empty result is normal, not an error. ``sort`` is one of
+    leg's. An empty result is normal, not an error: read ``summary``. ``sort`` is one of
     "price", "duration", "departure".
     """
     try:
