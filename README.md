@@ -6,6 +6,11 @@
   The Matrix — for AI agents.</em>
 </p>
 
+> **Try your agent in five minutes:**
+> [maya-agent-scenarios](https://github.com/shvinn/maya-agent-scenarios)
+> has one setup command and ten prompts to paste into your agent, each with
+> the result a good agent reaches.
+
 ## Overview
 
 Maya is an API simulator for AI agents: a fictional world of everyday
@@ -56,7 +61,7 @@ flowchart LR
 ## Install
 
 ```bash
-git clone https://github.com/<you>/maya.git
+git clone https://github.com/shvinn/maya.git
 cd maya
 uv sync
 ```

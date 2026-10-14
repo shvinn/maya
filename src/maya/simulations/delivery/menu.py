@@ -35,6 +35,7 @@ class MenuItem(NamedTuple):
             "name": self.name,
             "category": self.category,
             "price": self.price,
+            "currency": vendors.CURRENCY,
             "diet": self.diet,
         }
 

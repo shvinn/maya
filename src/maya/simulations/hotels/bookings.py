@@ -188,8 +188,11 @@ def search(
     max_total_price: int | None = None,
     limit: int = 10,
 ) -> list[dict]:
-    """Room types with a room free on every night of the stay, cheapest
-    total first, each flattened with its hotel's identifying fields."""
+    """Room types that fit the guests and price, each flattened with its
+    hotel's identifying fields: those with a room free on every night first,
+    cheapest total first, then sold-out ones (``sold_out: true``). Sold-out
+    rooms are listed, not hidden, so an empty-looking stay reads as "full",
+    not as "no such hotel" -- the way events list sold-out shows."""
     start, end, nights = parse_stay(check_in, check_out)
     zone_code = None
     if zone:
@@ -206,8 +209,6 @@ def search(
         if room.max_guests < guests:
             continue
         q = quote(room, nights)
-        if q["rooms_left"] == 0:
-            continue
         if max_total_price is not None and q["total"] > max_total_price:
             continue
         results.append({
@@ -223,12 +224,13 @@ def search(
             "check_out": end.isoformat(),
             "nights": len(nights),
             "rooms_left": q["rooms_left"],
+            "sold_out": q["rooms_left"] == 0,
             "nightly_prices": q["nightly_prices"],
             "total_price": {"amount": q["total"], "currency": CURRENCY},
             "refundable": hotel.refundable,
             "cancellation_policy": hotel.policy_text(),
         })
-    results.sort(key=lambda r: (r["total_price"]["amount"], r["room_type_id"]))
+    results.sort(key=lambda r: (r["sold_out"], r["total_price"]["amount"], r["room_type_id"]))
     return results[:limit]
 
 

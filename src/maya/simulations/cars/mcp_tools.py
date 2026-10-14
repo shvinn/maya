@@ -45,9 +45,11 @@ def cars_search_availability(
     Times are 'YYYY-MM-DD HH:MM'. Rentals are charged per started 24 hours
     from pickup, so 10:00 to 11:00 the next day is 2 days. ``car_class`` is
     one of "mini", "economy", "compact", "electric", "suv", "minivan",
-    "premium". Same-day pickup works -- it's an airport desk. Prices and
-    ``cars_left`` are computed live and rise as the days approach. An empty
-    list means nothing fits, not an error.
+    "premium"; anything else is an error. Same-day pickup works -- it's an
+    airport desk. Prices and ``cars_left`` are computed live and rise as the
+    days approach. Models with no car left for the whole rental are still
+    listed, last, with ``sold_out: true`` and ``cars_left`` 0. An empty list
+    means nothing fits the seats, class or price.
     """
     try:
         return rentals.search(pickup_at, dropoff_at, min_seats, car_class, max_total_price, limit)

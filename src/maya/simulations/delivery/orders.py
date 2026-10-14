@@ -34,7 +34,7 @@ from maya.world.geography import maps
 from . import db, vendors
 from .menu import BY_ITEM_ID
 
-CURRENCY = "bucks"
+CURRENCY = vendors.CURRENCY
 
 
 def _get_order(order_id: str) -> dict | None:
