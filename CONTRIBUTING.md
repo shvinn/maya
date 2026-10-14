@@ -54,7 +54,7 @@ Standard `src/` layout: `src/maya/` is the one installable package.
 ## Development
 
 ```bash
-git clone https://github.com/shvinn/maya.git
+git clone https://github.com/<you>/maya.git
 cd maya
 uv sync                  # install, including dev extras
 uv run pytest            # tests
