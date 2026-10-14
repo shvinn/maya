@@ -8,7 +8,7 @@ Two ways to run an MCP server:
   uv run maya mcp hotels        same, for the hotels domain
   uv run maya mcp cars          same, for the car rental domain
   uv run maya mcp events        same, for the events domain
-  uv run maya mcp world         same, for the world clock's controls
+  uv run maya mcp world         same, for the world controls (clock, reset)
   uv run maya serve             HTTP transport on :6292, one domain
                                  (flights by default; --domain delivery,
                                  hotels, cars, events or world for the others)
@@ -22,12 +22,15 @@ Two ways to run an MCP server:
                                  mcp_tools.combined_app for what this is and
                                  is not.
 
+And one to start the world over:
+
+  uv run maya reset             empty every domain's bookings, orders,
+                                 rentals and tickets, and return the clock
+                                 to real time (see maya.reset)
+
 ``serve`` binds 127.0.0.1 unless told otherwise (``--host``, or the
 ``MAYA_HOST`` environment variable -- the Docker image sets it to 0.0.0.0 so
 the server is reachable from outside the container).
-
-``MAYA_TIME_SCALE`` (e.g. 60 = one Maya hour per real minute) is applied to
-the world clock when a server starts; see maya.world.clock.
 
 There is no REST/OpenAPI surface yet -- only MCP is implemented. See the
 README for what's real versus what's still aspirational.
@@ -40,7 +43,6 @@ import os
 import sys
 
 from .mcp_tools import SERVERS as _SERVERS
-from .world import clock
 from .mcp_tools import combined_app
 
 
@@ -58,12 +60,9 @@ def main() -> None:
     mcp_cmd = sub.add_parser("mcp", help="Run an MCP server over stdio.")
     mcp_cmd.add_argument("domain", choices=list(_SERVERS))
 
-    args = parser.parse_args()
+    sub.add_parser("reset", help="Empty every domain and return the clock to real time.")
 
-    try:
-        clock.apply_env_scale()
-    except clock.ClockError as e:
-        parser.error(str(e))
+    args = parser.parse_args()
 
     if args.command == "serve":
         if args.domain == "all":
@@ -74,6 +73,11 @@ def main() -> None:
             _SERVERS[args.domain].run(transport="streamable-http", host=args.host, port=args.port)
     elif args.command == "mcp":
         _SERVERS[args.domain].run(transport="stdio")
+    elif args.command == "reset":
+        from .reset import reset_world
+
+        cleared = reset_world()
+        print("World reset. Cleared " + ", ".join(f"{n} {kind.replace('_', ' ')}" for kind, n in cleared.items()) + ".")
     else:
         parser.print_help()
         sys.exit(1)

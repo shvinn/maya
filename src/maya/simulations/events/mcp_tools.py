@@ -147,13 +147,3 @@ def events_cancel_booking(reference: str) -> dict:
         return tickets.cancel(reference)
     except tickets.TicketError as e:
         return _error(e.code, str(e), e.hint)
-
-
-@mcp.tool()
-def events_reset_bookings() -> dict:
-    """Clear every event booking and the tickets they held.
-
-    Reference data (venues, sections, event series) is untouched -- it isn't
-    state, it's world content.
-    """
-    return {"cleared": tickets.reset()}

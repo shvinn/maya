@@ -1,42 +1,39 @@
-"""Maya's world clock: Maya's own time zone, scaled against real time.
+"""Maya's world clock: Maya's own time zone, set ahead of real time.
 
 Every domain asks this module what time it is -- never ``datetime.now()`` --
 so the whole world agrees on "now" whatever machine it runs on, and time
-can be sped up, frozen or skipped ahead for scenarios that would otherwise
-take hours of real waiting.
+can be moved ahead for scenarios that would otherwise take hours of real
+waiting.
 
 Maya keeps Mayan Meridian Time (MYT), a fixed UTC-08:00 with no daylight
 saving. ``now()`` returns naive MYT wall-clock time, the same kind of value
 the domains always compared against.
 
-The clock is an anchor plus a scale::
+Maya time always runs at real speed. The clock is one row: the Maya time
+last set and the real time it was set at, both unix milliseconds::
 
-    maya_now = anchor_maya + (real_now - anchor_real) * scale
+    maya_now = maya_epoch_ms + (real_now - real_epoch_ms)   (shown in MYT)
 
-With nothing saved it is simply real time in MYT at 1:1. Scale 60 makes one
-real minute a Maya hour; scale 0 freezes the world. Every change re-anchors
-at the current Maya moment, so the clock never jumps, and time only moves
-forward -- except ``reset()``, which returns to real time and can therefore
-step backwards. The state is one row in the shared maya.db, so every
-process (the HTTP server, one stdio container per domain) reads the same
-clock, and Maya time carries on across restarts.
+With no row, Maya time is real time. Moving time ahead -- by a duration or
+to a given moment -- rewrites the row and is refused if it would go
+backwards; only a full world reset (``maya.reset``), which deletes the row
+along with every booking, can step back. The row
+lives in the shared maya.db, so every process (the HTTP server, one stdio
+container per domain) reads the same clock, and it holds across restarts:
+Maya time keeps running while the servers are stopped.
 """
 
 from __future__ import annotations
 
-import os
 import sqlite3
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 from maya import storage
 
 MYT = timezone(timedelta(hours=-8), "MYT")
 TIMEZONE_LABEL = "MYT (UTC-08:00)"
-MAX_SCALE = 10_000
-
 
 #: The shared maya.db -- see maya.storage for where it lives and why.
 DB_PATH = storage.db_path()
@@ -60,103 +57,105 @@ def _ensure_table(conn: sqlite3.Connection) -> None:
     clock. Reading the time must never write: domains read it inside their
     booking transactions, and a write on this separate connection would wait
     for that transaction's lock, held by the same thread, until it timed out.
+
+    Maya time starts as real time and only moves ahead, so it is never
+    behind real time; the CHECK makes the database refuse a row that is.
     """
     conn.execute(
         "CREATE TABLE IF NOT EXISTS world_clock ("
         " id INTEGER PRIMARY KEY CHECK (id = 1),"
-        " anchor_real REAL NOT NULL, anchor_maya TEXT NOT NULL, scale REAL NOT NULL)"
+        " maya_epoch_ms INTEGER NOT NULL, real_epoch_ms INTEGER NOT NULL,"
+        " CHECK (maya_epoch_ms >= real_epoch_ms))"
     )
 
 
-def _real_now() -> float:
-    """Real time as a UTC timestamp -- the one place real time is read."""
-    return time.time()
+def _real_now_ms() -> int:
+    """Real time as unix milliseconds -- the one place real time is read."""
+    return time.time_ns() // 1_000_000
 
 
-def _maya_at(real_ts: float) -> tuple[datetime, float]:
-    """(Maya time, scale) at a real instant."""
+def _maya_ms(real_ms: int) -> int:
+    """Maya time, as unix milliseconds, at a real instant."""
     try:
-        row = _connect().execute("SELECT anchor_real, anchor_maya, scale FROM world_clock WHERE id = 1").fetchone()
+        row = _connect().execute("SELECT maya_epoch_ms, real_epoch_ms FROM world_clock WHERE id = 1").fetchone()
     except sqlite3.OperationalError as e:
         if "no such table" not in str(e):
             raise
-        row = None  # never changed on this database: real time at 1:1
+        row = None  # never set on this database
     if row is None:
-        return datetime.fromtimestamp(real_ts, MYT).replace(tzinfo=None), 1.0
-    elapsed = (real_ts - row["anchor_real"]) * row["scale"]
-    return datetime.fromisoformat(row["anchor_maya"]) + timedelta(seconds=elapsed), row["scale"]
+        return real_ms
+    return row["maya_epoch_ms"] + (real_ms - row["real_epoch_ms"])
 
 
-def _save(maya: datetime, scale: float, real_ts: float) -> None:
+def _to_myt(unix_ms: int) -> datetime:
+    return datetime.fromtimestamp(unix_ms / 1000, MYT).replace(tzinfo=None)
+
+
+def _save(maya_ms: int, real_ms: int) -> None:
     conn = _connect()
     _ensure_table(conn)
-    conn.execute(
-        "INSERT OR REPLACE INTO world_clock (id, anchor_real, anchor_maya, scale) VALUES (1, ?, ?, ?)",
-        (real_ts, maya.isoformat(), scale),
-    )
-    conn.commit()
+    with conn:  # commits, or rolls back a refused write so it can't hold the lock
+        conn.execute(
+            "INSERT OR REPLACE INTO world_clock (id, maya_epoch_ms, real_epoch_ms) VALUES (1, ?, ?)",
+            (maya_ms, real_ms),
+        )
 
 
 def now() -> datetime:
     """The current Maya time, as naive MYT wall-clock time."""
-    return _maya_at(_real_now())[0]
+    return _to_myt(_maya_ms(_real_now_ms()))
 
 
 def state() -> dict:
-    real_ts = _real_now()
-    maya, scale = _maya_at(real_ts)
+    real_ms = _real_now_ms()
+    maya = _to_myt(_maya_ms(real_ms))
     return {
         "maya_time": maya.strftime("%Y-%m-%d %H:%M:%S"),
         "weekday": maya.strftime("%A"),
         "timezone": TIMEZONE_LABEL,
-        "scale": scale,
-        "frozen": scale == 0,
-        "real_time_utc": datetime.fromtimestamp(real_ts, timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "real_time_utc": datetime.fromtimestamp(real_ms / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
     }
 
 
-def set_scale(scale: float) -> dict:
-    """Change how fast Maya time runs against real time, from now on."""
-    if not 0 <= scale <= MAX_SCALE:
-        raise InvalidScale(f"scale must be between 0 and {MAX_SCALE}; got {scale}.")
-    real_ts = _real_now()
-    maya, _ = _maya_at(real_ts)
-    _save(maya, float(scale), real_ts)
-    return state()
-
-
 def advance(minutes: float = 0, hours: float = 0, days: float = 0) -> dict:
-    """Skip Maya time ahead. Never backwards."""
+    """Move Maya time ahead by a duration. Never backwards."""
     delta = timedelta(minutes=minutes, hours=hours, days=days)
     if delta <= timedelta(0):
         raise InvalidDuration("Time only moves forward: give a positive number of minutes, hours or days.")
-    real_ts = _real_now()
-    maya, scale = _maya_at(real_ts)
-    _save(maya + delta, scale, real_ts)
+    real_ms = _real_now_ms()
+    _save(_maya_ms(real_ms) + delta // timedelta(milliseconds=1), real_ms)
     return state()
 
 
-def reset() -> dict:
-    """Back to real time in MYT at 1:1. If time had been skipped ahead,
-    this steps backwards -- bookings made in the skipped-ahead time may then
-    look like they're in the future."""
+def set_time(maya_time: str) -> dict:
+    """Move Maya time ahead to a given moment, ``YYYY-MM-DD HH:MM`` in MYT.
+    Never backwards."""
+    try:
+        target = datetime.fromisoformat(maya_time.strip())
+    except ValueError:
+        raise InvalidTime(f"{maya_time!r} isn't a time; use YYYY-MM-DD HH:MM (Maya time, MYT).") from None
+    if target.tzinfo is None:
+        target = target.replace(tzinfo=MYT)
+    target_ms = round(target.timestamp() * 1000)
+    real_ms = _real_now_ms()
+    current_ms = _maya_ms(real_ms)
+    if target_ms <= current_ms:
+        raise InvalidTime(
+            f"Time only moves forward: it's already {_to_myt(current_ms):%Y-%m-%d %H:%M:%S} in Maya, "
+            f"and {_to_myt(target_ms):%Y-%m-%d %H:%M:%S} isn't after that."
+        )
+    _save(target_ms, real_ms)
+    return state()
+
+
+def _reset() -> None:
+    """Back to real time in MYT -- the one way time goes backwards. Only
+    ``maya.reset.reset_world`` calls this, together with emptying every
+    domain's bookings."""
     conn = _connect()
     _ensure_table(conn)
-    conn.execute("DELETE FROM world_clock")
-    conn.commit()
-    return state()
-
-
-def apply_env_scale() -> None:
-    """Apply MAYA_TIME_SCALE, if set, when a server process starts."""
-    value = os.environ.get("MAYA_TIME_SCALE")
-    if value is None or not value.strip():
-        return
-    try:
-        scale = float(value)
-    except ValueError:
-        raise InvalidScale(f"MAYA_TIME_SCALE must be a number; got {value!r}.") from None
-    set_scale(scale)
+    with conn:
+        conn.execute("DELETE FROM world_clock")
 
 
 class ClockError(Exception):
@@ -166,11 +165,11 @@ class ClockError(Exception):
     hint = None
 
 
-class InvalidScale(ClockError):
-    code = "invalid_scale"
-    hint = f"Use 1 for real time, a larger number to speed up (up to {MAX_SCALE}), or 0 to freeze."
+class InvalidTime(ClockError):
+    code = "invalid_time"
+    hint = "Give a Maya time (MYT) later than now, as YYYY-MM-DD HH:MM."
 
 
 class InvalidDuration(ClockError):
     code = "invalid_duration"
-    hint = "Pass a positive minutes, hours or days. To go back to real time, use world_reset_time."
+    hint = "Pass a positive minutes, hours or days."

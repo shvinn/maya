@@ -141,14 +141,3 @@ def hotels_cancel_booking(reference: str) -> dict:
         return bookings.cancel(reference)
     except bookings.BookingError as e:
         return _error(e.code, str(e), e.hint)
-
-
-@mcp.tool()
-def hotels_reset_bookings() -> dict:
-    """Clear every hotel booking and the rooms they held.
-
-    Reference data (hotels, room types) is untouched -- it isn't state,
-    it's world content.
-    """
-    cleared = bookings.reset()
-    return {"cleared": cleared}

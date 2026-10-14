@@ -57,7 +57,7 @@ sale.
 
 `CONFIRMED` until the show starts, `IN_PROGRESS` while it's on, `ENDED`
 after. `CANCELLED` is the only stored status. All times are Maya time (MYT, UTC−08:00), which
-the `world` server can speed up or skip ahead — see "Maya time" in the repo
+the `world` server can move ahead — see "Maya time" in the repo
 README.
 
 ## Aira only, bucks only

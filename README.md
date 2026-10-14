@@ -83,7 +83,7 @@ uv run maya serve --domain delivery   # delivery, same, :6292
 uv run maya serve --domain hotels     # hotels, same, :6292
 uv run maya serve --domain cars       # car rental, same, :6292
 uv run maya serve --domain events     # events, same, :6292
-uv run maya serve --domain world      # world clock controls, same, :6292
+uv run maya serve --domain world      # world controls (clock, reset), same, :6292
 uv run maya serve --domain all        # all at once, one port, one path each:
                                        #   http://localhost:6292/flights/mcp
                                        #   http://localhost:6292/delivery/mcp
@@ -119,27 +119,28 @@ Maya runs on its own clock: **Mayan Meridian Time (MYT), a fixed UTC−08:00**
 with no daylight saving. Every deadline, status and price uses it, so Maya
 agrees on "now" whether it runs on your laptop, in Docker or in CI.
 
-By default Maya time follows real time 1:1. To test something that takes
-hours or days — a delivery arriving, a check-out, a show ending — speed it up
-or skip ahead instead of waiting:
+Maya time always runs at real speed; it starts as real time (in MYT). To
+test something that takes hours or days — a delivery arriving, a check-out,
+a show ending — move it ahead instead of waiting:
 
 | Tool (on the `world` server) | Effect |
 | --- | --- |
 | `world_get_time` | What time it is in Maya (also on every domain server) |
-| `world_set_time_scale(scale)` | `1` real time, `60` one Maya hour per real minute, `1440` a Maya day per minute, `0` frozen |
-| `world_advance_time(minutes, hours, days)` | Skip ahead instantly — forward only |
-| `world_reset_time` | Back to real time at 1:1 |
+| `world_advance_time(minutes, hours, days)` | Move ahead by a duration — forward only |
+| `world_set_time(maya_time)` | Move ahead to a moment, e.g. `2030-03-08 09:00` — forward only |
+| `world_reset` | Start over: empty every domain and go back to real time |
 
-At scale 60, a 45-minute delivery arrives in 45 real seconds. Set a scale at
-startup with `MAYA_TIME_SCALE=60` (works in Docker too). The controls live on
-their own `world` server (`maya mcp world`, `/world/mcp`) so the agent you're
-testing — connected to a domain server — can read the time but can't skip
-past its own deadlines.
+The controls live on their own `world` server (`maya mcp world`,
+`/world/mcp`) so the agent you're testing — connected to a domain server —
+can read the time but can't skip past its own deadlines.
 
-The clock is saved in `maya.db` with the bookings, so Maya time carries on
-across restarts — and keeps running against real time while the server is
-stopped. Freeze it first (scale `0`) if you want to pick up exactly where
-you left off.
+`maya.db` keeps the Maya time last set and the real time it was set at, so
+Maya time carries on across restarts, and keeps running while the server is
+stopped.
+
+A reset — `world_reset`, or `uv run maya reset` from a terminal — empties
+every domain's bookings, orders, rentals and tickets and returns the clock
+to real time, all at once. It's the only way time goes backwards.
 
 ## Run with Docker
 
@@ -171,8 +172,8 @@ docker compose up                      # same as the first, from a clone
 
 Pick one of three setups. Each gives you six servers: `flights`, `delivery`,
 `hotels`, `cars`, `events` and `world`. Give the agent you're testing the
-domain servers; keep `world` (the clock controls) for yourself, so the agent
-can't skip past its own deadlines.
+domain servers; keep `world` (the clock and reset controls) for yourself,
+so the agent can't skip past its own deadlines or wipe the world.
 
 ### 1. Local, from a clone (stdio)
 

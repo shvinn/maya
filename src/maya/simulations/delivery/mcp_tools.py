@@ -142,14 +142,3 @@ def delivery_cancel_order(order_id: str) -> dict:
         return orders.cancel(order_id)
     except orders.OrderError as e:
         return _error(e.code, str(e), e.hint)
-
-
-@mcp.tool()
-def delivery_reset_orders() -> dict:
-    """Clear every order for this database.
-
-    Reference data (vendors, menu items) is untouched -- it isn't state,
-    it's world content.
-    """
-    cleared = orders.reset()
-    return {"cleared": cleared}

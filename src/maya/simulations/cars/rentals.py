@@ -1,7 +1,7 @@
 """Car rentals, persisted in SQLite.
 
-A rental and the cars out per day survive a restart; ``reset()`` (the
-``cars_reset_rentals`` tool) empties them. Booking is a single step, same as
+A rental and the cars out per day survive a restart; ``reset()`` empties
+them, as part of a world reset (see maya.reset). Booking is a single step, same as
 every other domain: search, book, confirmed -- no hold, no deposit, no
 payment call.
 
@@ -342,7 +342,7 @@ def cancel(reference: str) -> dict:
 
 
 def reset() -> int:
-    """Empty all rentals and cars out. The ``cars_reset_rentals`` tool.
+    """Empty all rentals and cars out. Part of a world reset (see maya.reset).
 
     Returns the number of rentals cleared.
     """
