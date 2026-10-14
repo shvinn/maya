@@ -177,8 +177,16 @@ def search(
     max_total_price: int | None = None,
     limit: int = 10,
 ) -> list[dict]:
-    """Models with a car free on every day of the rental, cheapest total first."""
+    """Models that fit the seats, class and price: those with a car free on
+    every day of the rental first, cheapest total first, then sold-out ones
+    (``sold_out: true``) -- listed, not hidden, so "all gone" doesn't read
+    as "no such car". An unknown ``car_class`` is refused rather than
+    matching nothing."""
     pickup, dropoff, days = parse_rental(pickup_at, dropoff_at)
+    if car_class:
+        classes = sorted({car.car_class for car in fleet.CARS})
+        if car_class.strip().lower() not in classes:
+            raise UnknownCarClass(f"Unknown car class {car_class!r}. Classes: {', '.join(classes)}.")
     results = []
     for car in fleet.CARS:
         if min_seats and car.seats < min_seats:
@@ -186,8 +194,6 @@ def search(
         if car_class and car.car_class != car_class.strip().lower():
             continue
         q = quote(car, days)
-        if q["cars_left"] == 0:
-            continue
         if max_total_price is not None and q["total"] > max_total_price:
             continue
         results.append({
@@ -196,10 +202,11 @@ def search(
             "dropoff_at": f"{dropoff:%Y-%m-%d %H:%M}",
             "rental_days": len(days),
             "cars_left": q["cars_left"],
+            "sold_out": q["cars_left"] == 0,
             "daily_prices": q["daily_prices"],
             "total_price": {"amount": q["total"], "currency": CURRENCY},
         })
-    results.sort(key=lambda r: (r["total_price"]["amount"], r["car_id"]))
+    results.sort(key=lambda r: (r["sold_out"], r["total_price"]["amount"], r["car_id"]))
     return results[:limit]
 
 
@@ -360,6 +367,11 @@ class RentalError(Exception):
 class CarNotFound(RentalError):
     code = "not_found"
     hint = "Check the car id against cars_list_cars or cars_search_availability."
+
+
+class UnknownCarClass(RentalError):
+    code = "invalid_request"
+    hint = "Use one of the classes listed, or leave car_class out."
 
 
 class InvalidDates(RentalError):

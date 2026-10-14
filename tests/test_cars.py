@@ -111,3 +111,19 @@ def test_cancelling_before_pickup_refunds_and_frees_the_car():
     assert result["refund"] == rental["total_price"]
     assert rentals.cars_available(car, day) == before
     assert error_code(t.cars_cancel_rental(rental["rental_reference"])) == "already_cancelled"
+
+
+def test_a_sold_out_model_is_listed_last_not_hidden():
+    for i in range(2):
+        book("OVY", at(hours=1), at(days=1, hours=1), email=f"d{i}@example.mb")
+    results = t.cars_search_availability(at(hours=1), at(days=1, hours=1))
+    minivan = next(r for r in results if r["car_id"] == "OVY")
+    assert minivan["sold_out"] is True and minivan["cars_left"] == 0
+    assert results[-1] is minivan
+
+
+def test_an_unknown_car_class_is_refused_not_filtered_to_nothing():
+    result = t.cars_search_availability(at(days=2), at(days=3), car_class="sedan")
+    assert error_code(result) == "invalid_request"
+    assert "suv" in result.structured_content["error"]["message"]
+    assert t.cars_search_availability(at(days=2), at(days=3), car_class="SUV")[0]["car_class"] == "suv"

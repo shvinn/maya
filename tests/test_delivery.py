@@ -47,3 +47,10 @@ def test_delivery_only_reaches_aira_zones():
 
 def test_items_must_come_from_the_vendors_menu():
     assert error_code(place(items=[{"item_id": "CBS-01", "quantity": 1}])) == "not_found"
+
+
+def test_every_price_says_its_currency():
+    menu = t.delivery_get_menu("OQN")
+    assert menu["vendor"]["currency"] == "bucks"
+    assert {item["currency"] for item in menu["items"]} == {"bucks"}
+    assert {item["currency"] for item in t.delivery_search_menu_items("noodles")} == {"bucks"}

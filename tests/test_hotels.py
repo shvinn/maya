@@ -166,3 +166,13 @@ def test_list_bookings_filters_by_email_case_insensitively():
     book(email="Alice@Example.mb")
     book(email="bob@example.mb")
     assert len(t.hotels_list_bookings(email="alice@example.mb")) == 1
+
+
+def test_a_sold_out_room_type_is_listed_last_not_hidden():
+    for i in range(5):
+        book("TCG-STE", check_in=1, nights=2, guests=2, email=f"g{i}@example.mb")
+    results = t.hotels_search_availability(day(1), day(3), guests=4, zone="AIR-CAP")
+    suite = next(r for r in results if r["room_type_id"] == "TCG-STE")
+    assert suite["sold_out"] is True and suite["rooms_left"] == 0
+    assert results[-1] is suite
+    assert all(r["sold_out"] is False for r in results[:-1])

@@ -70,7 +70,9 @@ def hotels_search_availability(
     and zone plus per-night prices and the total, so you can go straight to
     hotels_book_room. Prices and ``rooms_left`` are computed live -- nights
     get fuller and dearer as they approach, so the same search can return
-    different numbers later. An empty list means nothing fits, not an error.
+    different numbers later. Room types with no room left for the whole stay
+    are still listed, last, with ``sold_out: true`` and ``rooms_left`` 0.
+    An empty list means nothing fits the guests, zone or price.
     """
     try:
         return bookings.search(check_in, check_out, guests, zone, max_total_price, limit)

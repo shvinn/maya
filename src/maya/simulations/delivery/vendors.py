@@ -18,6 +18,10 @@ from typing import NamedTuple
 
 from . import db
 
+#: Maya's currency. Every price in this domain is in it; vendors and menu
+#: items say so, so a price is never read as dollars.
+CURRENCY = "bucks"
+
 
 class Vendor(NamedTuple):
     code: str
@@ -37,6 +41,7 @@ class Vendor(NamedTuple):
             "style": self.style,
             "prep_minutes": self.prep_minutes,
             "delivery_fee": self.delivery_fee,
+            "currency": CURRENCY,
         }
 
 
