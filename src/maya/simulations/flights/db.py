@@ -25,11 +25,11 @@ DB_PATH = storage.db_path()
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
 #: Column name -> converter, applied when a CSV cell isn't already a string.
-_CONVERTERS = {"rate_per_minute": float, "seats": int, "duration_minutes": int}
+_CONVERTERS = {"rate_per_minute": float, "on_time_rate": float, "cancel_rate": float, "seats": int, "duration_minutes": int}
 
 _REFERENCE_TABLES = {
     "airports": ("code", "city", "name"),
-    "airlines": ("code", "name", "style", "rate_per_minute"),
+    "airlines": ("code", "name", "style", "rate_per_minute", "on_time_rate", "cancel_rate"),
     "aircraft": ("code", "name", "seats"),
     "schedule": (
         "flight_number", "airline", "origin", "destination",
@@ -70,6 +70,11 @@ def connect() -> sqlite3.Connection:
 
 
 def _init(conn: sqlite3.Connection) -> None:
+    # Airlines gained reliability columns; a table from before them is
+    # rebuilt -- it's reference data, reloaded from CSV below anyway.
+    columns = {r["name"] for r in conn.execute("PRAGMA table_info(airlines)")}
+    if columns and "on_time_rate" not in columns:
+        conn.execute("DROP TABLE airlines")
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS airports (
@@ -77,7 +82,8 @@ def _init(conn: sqlite3.Connection) -> None:
         );
         CREATE TABLE IF NOT EXISTS airlines (
             code TEXT PRIMARY KEY, name TEXT NOT NULL, style TEXT NOT NULL,
-            rate_per_minute REAL NOT NULL
+            rate_per_minute REAL NOT NULL, on_time_rate REAL NOT NULL,
+            cancel_rate REAL NOT NULL
         );
         CREATE TABLE IF NOT EXISTS aircraft (
             code TEXT PRIMARY KEY, name TEXT NOT NULL, seats INTEGER NOT NULL
@@ -93,6 +99,10 @@ def _init(conn: sqlite3.Connection) -> None:
         );
         CREATE TABLE IF NOT EXISTS seats_sold (
             flight_key TEXT PRIMARY KEY, count INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS flight_overrides (
+            flight_key TEXT PRIMARY KEY, cancelled INTEGER NOT NULL,
+            delay_minutes INTEGER NOT NULL
         );
         """
     )
@@ -123,5 +133,6 @@ def reset_world() -> int:
     count = conn.execute("SELECT COUNT(*) AS n FROM bookings").fetchone()["n"]
     conn.execute("DELETE FROM bookings")
     conn.execute("DELETE FROM seats_sold")
+    conn.execute("DELETE FROM flight_overrides")
     conn.commit()
     return count

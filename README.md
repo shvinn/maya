@@ -125,7 +125,24 @@ own name for it, such as `booking_reference`, `rental_reference` or
 `order_id`, is still there too.) Bookings are atomic: two agents racing for
 the last seat can't both get it.
 
-## Maya time
+## World controls
+
+Whoever runs the world — you, or a test harness — controls its clock, its
+luck and resets from the `world` server (`maya mcp world`, `/world/mcp`).
+Give the agent you're testing only the domain servers: it can read the
+time, but can't skip past its own deadlines, see the seed, or wipe the
+world.
+
+| Tool (on the `world` server) | Effect |
+| --- | --- |
+| `world_get_time` | What time it is in Maya (also on every domain server) |
+| `world_advance_time(minutes, hours, days)` | Move ahead by a duration — forward only |
+| `world_set_time(maya_time)` | Move ahead to a moment, e.g. `2030-03-08 09:00` — forward only |
+| `world_reset(seed)` | Start over: empty every domain, go back to real time, and reseed the world's luck |
+| `world_get_seed` | This world's seed, to replay it |
+| `world_set_flight_status(flight_number, date, delay_minutes, cancelled)` | Decide one flight's fate, to stage a disruption |
+
+### Maya time
 
 Maya runs on its own clock: **Mayan Meridian Time (MYT), a fixed UTC−08:00**
 with no daylight saving. Every deadline, status and price uses it, so Maya
@@ -133,26 +150,29 @@ agrees on "now" whether it runs on your laptop, in Docker or in CI.
 
 Maya time always runs at real speed; it starts as real time (in MYT). To
 test something that takes hours or days — a delivery arriving, a check-out,
-a show ending — move it ahead instead of waiting:
-
-| Tool (on the `world` server) | Effect |
-| --- | --- |
-| `world_get_time` | What time it is in Maya (also on every domain server) |
-| `world_advance_time(minutes, hours, days)` | Move ahead by a duration — forward only |
-| `world_set_time(maya_time)` | Move ahead to a moment, e.g. `2030-03-08 09:00` — forward only |
-| `world_reset` | Start over: empty every domain and go back to real time |
-
-The controls live on their own `world` server (`maya mcp world`,
-`/world/mcp`) so the agent you're testing — connected to a domain server —
-can read the time but can't skip past its own deadlines.
-
+a show ending, a delay being announced — move it ahead instead of waiting.
 `maya.db` keeps the Maya time last set and the real time it was set at, so
 Maya time carries on across restarts, and keeps running while the server is
 stopped.
 
+### Luck: delays and cancellations
+
+Flights run late and get cancelled, by chance, at rates set by each airline
+— and the agent only finds out by checking (see the
+[flights notes](src/maya/simulations/flights/README.md)). Chance comes from
+the **world seed**, not the clock: the seed decides *what* happens to a
+flight, the clock only *when* it's announced. Within one world the seed is
+consistent, and every reset draws a new one, so nothing can be learned from
+a previous run. For repeatable runs, pin it: `world_reset(seed=42)`,
+`uv run maya reset --seed 42`, or `MAYA_SEED=42` in the environment. To
+stage one disruption exactly, use `world_set_flight_status`.
+
+### Reset
+
 A reset — `world_reset`, or `uv run maya reset` from a terminal — empties
-every domain's bookings, orders, rentals, tickets and reservations and
-returns the clock to real time, all at once. It's the only way time goes backwards.
+every domain's bookings, orders, rentals, tickets and reservations, drops
+flight overrides, returns the clock to real time and reseeds the world, all
+at once. It's the only way time goes backwards.
 
 ## Run with Docker
 

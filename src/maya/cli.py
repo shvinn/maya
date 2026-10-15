@@ -27,8 +27,9 @@ Two ways to run an MCP server:
 And one to start the world over:
 
   uv run maya reset             empty every domain's bookings, orders,
-                                 rentals, tickets and reservations, and
-                                 return the clock to real time (see
+                                 rentals, tickets and reservations, return
+                                 the clock to real time and reseed the
+                                 world (--seed N to replay one; see
                                  maya.reset)
 
 ``serve`` binds 127.0.0.1 unless told otherwise (``--host``, or the
@@ -63,7 +64,8 @@ def main() -> None:
     mcp_cmd = sub.add_parser("mcp", help="Run an MCP server over stdio.")
     mcp_cmd.add_argument("domain", choices=list(_SERVERS))
 
-    sub.add_parser("reset", help="Empty every domain and return the clock to real time.")
+    reset = sub.add_parser("reset", help="Empty every domain, return the clock to real time and reseed the world.")
+    reset.add_argument("--seed", type=int, help="replay a world: its delays and cancellations (default: MAYA_SEED, else random)")
 
     args = parser.parse_args()
 
@@ -78,9 +80,11 @@ def main() -> None:
         _SERVERS[args.domain].run(transport="stdio")
     elif args.command == "reset":
         from .reset import reset_world
+        from .world import seed
 
-        cleared = reset_world()
+        cleared = reset_world(args.seed)
         print("World reset. Cleared " + ", ".join(f"{n} {kind.replace('_', ' ')}" for kind, n in cleared.items()) + ".")
+        print(f"Seed: {seed.get()}")
     else:
         parser.print_help()
         sys.exit(1)

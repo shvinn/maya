@@ -124,7 +124,7 @@ def test_every_domain_can_read_the_time_but_only_world_can_change_it():
     for name, server in SERVERS.items():
         tools = {t.name for t in asyncio.run(server.list_tools())}
         assert "world_get_time" in tools, name
-        controls = {"world_set_time", "world_advance_time", "world_reset"}
+        controls = {"world_set_time", "world_advance_time", "world_reset", "world_get_seed", "world_set_flight_status"}
         assert (controls <= tools) == (name == "world"), name
         assert not any("reset" in t for t in tools - {"world_reset"}), name  # only world resets
 

@@ -5,9 +5,10 @@ then calls straight into this package's own modules. No business logic
 lives here, so the same rules hold however the domain is exposed.
 
 Scope note: this exposes only what is implemented. There is no
-search -> hold -> pay lifecycle (no held offers, no separate pay step) and
-no flight-status simulation yet; booking is the one step
-``flights_book_flight`` describes: search, book, confirmed.
+search -> hold -> pay lifecycle (no held offers, no separate pay step);
+booking is the one step ``flights_book_flight`` describes: search, book,
+confirmed. Delays and cancellations are only ever found by asking --
+nothing is pushed to the caller.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from mcp.server.mcpserver import MCPServer
 from maya.tool_errors import tool_error as _error
 from maya.world.mcp_tools import add_time_tool
 
-from . import airports, bookings, connections, schedule, search
+from . import airports, bookings, connections, operations, schedule, search
 
 mcp = MCPServer("maya-flights")
 add_time_tool(mcp)
@@ -68,8 +69,12 @@ def flights_search_flights(
     neither, there is no service. ``max_stops=0`` returns direct flights
     only. ``airline`` (a code like "PF" or a name like "Puffin Air") keeps
     options where every leg is that airline; an unknown airline is an error.
-    ``not_enough_seats`` and ``over_max_price`` count flights that operate
-    but were left out, and ``summary`` says why a result is empty. Seats
+    ``not_enough_seats``, ``over_max_price`` and
+    ``cancelled_or_misconnecting`` count flights that operate but were left
+    out, and ``summary`` says why a result is empty. Each flight carries its
+    live ``flight_status`` and estimated times; a cancellation is announced
+    24 hours before departure and a delay 3 hours before, so a flight
+    that's SCHEDULED today can still turn out late. Seats
     and prices are computed live, so a search minutes apart can return
     different numbers. A connection on one airline costs 20% less than its
     legs bought separately (``connection_discount_per_passenger``); across
@@ -138,8 +143,17 @@ def flights_book_flight(
                 "Search again for a date this flight actually flies.",
             )
         legs.append(flight)
+    for flight in legs:
+        if operations.status(flight).cancelled:
+            return _error(
+                "flight_cancelled",
+                f"{flight.flight_number} on {flight.date.isoformat()} has been cancelled by the airline.",
+                "Search again for another flight.",
+            )
     if len(legs) == 2:
         problem = connections.problem(*legs)
+        if problem is None and operations.misconnects(*legs):
+            problem = f"{legs[0].flight_number} is delayed and now lands too late to connect to {legs[1].flight_number}."
         if problem:
             return _error(
                 "invalid_connection",
@@ -153,8 +167,37 @@ def flights_book_flight(
 
 
 @mcp.tool()
+def flights_get_flight_status(flight_number: str, date: str) -> dict:
+    """Check one flight on one date (YYYY-MM-DD): SCHEDULED, DELAYED,
+    CANCELLED, DEPARTED or LANDED, with estimated departure and arrival.
+
+    Nothing announces a change -- check again closer to departure. A
+    cancellation is known 24 hours ahead and a delay 3 hours ahead, so
+    SCHEDULED means no news yet, not a promise. Some airlines run late far
+    more often than others.
+    """
+    try:
+        day = Date.fromisoformat(date)
+    except ValueError:
+        return _error("invalid_request", f"{date!r} is not a YYYY-MM-DD date.")
+    flight = schedule.find(flight_number, day)
+    if flight is None:
+        return _error(
+            "not_found",
+            f"{flight_number} does not operate on {date}.",
+            "Check the flight number and date against your booking or flights_search_flights.",
+        )
+    return {**flight.to_dict(), **operations.status(flight).to_dict()}
+
+
+@mcp.tool()
 def flights_get_booking(booking_reference: str) -> dict:
-    """Retrieve a booking by its reference."""
+    """Retrieve a booking by its reference.
+
+    Each leg carries its live ``flight_status``, ``delay_minutes`` and
+    estimated times, and ``disruption`` sums it up: FLIGHT_CANCELLED,
+    MISSED_CONNECTION, LONG_DELAY (3 hours or more), DELAYED, or null.
+    """
     booking = bookings.get(booking_reference)
     if booking is None:
         return _error(
@@ -179,7 +222,10 @@ def flights_cancel_booking(booking_reference: str) -> dict:
     Puffin Air fares can never be cancelled (fails with ``not_refundable``).
     Everyone else can cancel for a full refund any time up to 24 hours before
     departure; inside that window it fails with ``too_late_to_cancel`` rather
-    than silently doing nothing.
+    than silently doing nothing. Both rules give way when the airline lets
+    the traveller down: a booking whose ``disruption`` is FLIGHT_CANCELLED,
+    MISSED_CONNECTION or LONG_DELAY cancels for a full refund (the last two
+    only until the first flight leaves).
     """
     try:
         return bookings.cancel(booking_reference)

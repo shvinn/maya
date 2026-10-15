@@ -5,6 +5,9 @@ MAYA_DB_PATH has to point at a temporary file *before* any maya module is
 imported -- which is why it's set at the top of this file, ahead of the
 imports below. Tests therefore never touch the repo's own maya.db.
 
+MAYA_SEED pins the world seed the same way, so the flights that are
+delayed or cancelled are the same on every run (see maya.world.seed).
+
 Prices, availability, statuses and cancellation windows all depend on
 "now", which every domain reads from the world clock
 (``maya.world.clock.now``). That one function is replaced for every test
@@ -24,6 +27,8 @@ import pytest
 from mcp_types import CallToolResult
 
 os.environ["MAYA_DB_PATH"] = str(Path(tempfile.mkdtemp(prefix="maya-tests-")) / "maya.db")
+#: Every world in the suite has the same luck, so a run is repeatable.
+os.environ["MAYA_SEED"] = "20300304"
 
 from maya.reset import reset_world  # noqa: E402
 from maya.world import clock as world_clock  # noqa: E402
