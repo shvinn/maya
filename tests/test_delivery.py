@@ -71,3 +71,30 @@ def test_zones_come_with_their_names():
     assert t.delivery_search_menu_items("sirloin")[0]["zone_name"] == "Finance Quarter"
     order = place("Portside")
     assert (order["vendor_zone_name"], order["delivery_zone_name"]) == ("Old Aira", "Portside")
+
+
+def test_a_scheduled_order_waits_then_arrives_at_the_set_time(clock):
+    # OQN to Old Aira: 22 min prep + an 8-minute hop, so the kitchen starts at 18:30
+    order = t.delivery_place_order("OQN", [{"item_id": "OQN-01", "quantity": 1}], "AIR-OLD", "+1", "2030-03-09 19:00")
+    assert (order["status"], order["deliver_at"]) == ("SCHEDULED", "2030-03-09 19:00:00")
+    clock.set(clock.now.replace(day=9, hour=18, minute=29))
+    assert t.delivery_get_order(order["reference"])["status"] == "SCHEDULED"
+    clock.set(clock.now.replace(day=9, hour=18, minute=30))
+    assert t.delivery_get_order(order["reference"])["status"] == "PREPARING"
+    clock.set(clock.now.replace(day=9, hour=19, minute=0))
+    assert t.delivery_get_order(order["reference"])["status"] == "DELIVERED"
+
+
+def test_a_scheduled_order_can_be_cancelled_until_the_courier_has_it():
+    ref = t.delivery_place_order("OQN", [{"item_id": "OQN-01", "quantity": 1}], "AIR-OLD", "+1", "2030-03-09 19:00")["reference"]
+    assert t.delivery_cancel_order(ref)["status"] == "CANCELLED"
+
+
+def test_delivery_time_must_be_reachable_and_within_a_week():
+    def at(when):
+        return t.delivery_place_order("OQN", [{"item_id": "OQN-01", "quantity": 1}], "AIR-OLD", "+1", when)
+
+    assert error_code(at("2030-03-04 09:15")) == "invalid_delivery_time"  # ETA is 30 minutes
+    assert at("2030-03-04 09:30")["status"] == "PREPARING"  # exactly the ETA: the kitchen starts now
+    assert error_code(at("2030-03-12 09:00")) == "invalid_delivery_time"  # 8 days out
+    assert error_code(at("Saturday 7pm")) == "invalid_delivery_time"

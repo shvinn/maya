@@ -42,16 +42,25 @@ hold/capture and no payments domain behind either of them yet.
 ## Order status is computed live, not stored
 
 `delivery_get_order` doesn't return whatever status was true when the order
-was placed — it computes `PREPARING` → `OUT_FOR_DELIVERY` → `DELIVERED` from
-elapsed Maya time against the vendor's prep time and the courier's travel
+was placed — it computes `SCHEDULED` → `PREPARING` → `OUT_FOR_DELIVERY` →
+`DELIVERED` from elapsed Maya time against the vendor's prep time and the courier's travel
 time, every time you call it. Two calls a few minutes apart can legitimately
 show different statuses without anything else having happened. Maya time
 follows real time by default; the `world` server can move it
 ahead (see "Maya time" in the repo README).
 
-## Cancellation only works while still `PREPARING`
+## Orders can be scheduled up to a week ahead
 
-Once the computed status moves to `OUT_FOR_DELIVERY`, `delivery_cancel_order`
+Pass `deliver_at` to have an order arrive at a set time. It must be at least
+the order's ETA away (`invalid_delivery_time` otherwise, naming the earliest
+possible time) and at most 7 days out. The order is `SCHEDULED` until the
+kitchen starts on it, prep and courier time before `deliver_at`, then runs
+as usual and arrives on time. Kitchens have no opening hours yet, so any
+hour works.
+
+## Cancellation only works until the courier has it
+
+A `SCHEDULED` or `PREPARING` order can be cancelled. Once the computed status moves to `OUT_FOR_DELIVERY`, `delivery_cancel_order`
 fails with `too_late_to_cancel` — a courier can't be recalled. Vendors with
 a `ghost_kitchen` style have near-zero prep time, so in practice their
 orders are almost never cancellable; that's a consequence of the timing, not
