@@ -15,6 +15,7 @@ from maya import storage
 from maya.mcp_tools import SERVERS
 from maya.simulations.cars import mcp_tools as cars
 from maya.simulations.delivery import mcp_tools as delivery
+from maya.simulations.dining import mcp_tools as dining
 from maya.simulations.events import mcp_tools as events
 from maya.simulations.flights import mcp_tools as flights
 from maya.simulations.hotels import bookings as hotel_bookings
@@ -90,7 +91,7 @@ def test_concurrent_bookings_get_unique_references():
 # --- one reference field everywhere -------------------------------------------
 
 
-@pytest.mark.parametrize("domain", ["flights", "hotels", "cars", "events", "delivery"])
+@pytest.mark.parametrize("domain", ["flights", "hotels", "cars", "events", "dining", "delivery"])
 def test_every_domain_returns_a_shared_reference_field(domain):
     if domain == "flights":
         made = flights.flights_book_flight("SA101", "2030-03-13", ["A"], "a@example.mb")
@@ -115,6 +116,12 @@ def test_every_domain_returns_a_shared_reference_field(domain):
         got, listed, cancelled = (
             events.events_get_booking(made["reference"]), events.events_list_bookings(),
             events.events_cancel_booking(made["reference"]),
+        )
+    elif domain == "dining":
+        made = dining.dining_book_table("OQN", day(2), "13:00", 2, "A", "+1")
+        got, listed, cancelled = (
+            dining.dining_get_reservation(made["reference"]), dining.dining_list_reservations(),
+            dining.dining_cancel_reservation(made["reference"]),
         )
     else:
         made = delivery.delivery_place_order("OQN", [{"item_id": "OQN-01", "quantity": 1}], "AIR-OLD", "+1")

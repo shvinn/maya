@@ -4,7 +4,7 @@ Each ``simulations/<domain>/`` package owns its own ``mcp_tools.py`` -- that
 domain's ``MCPServer`` and its tool registrations (see
 ``simulations/flights/mcp_tools.py``, ``simulations/delivery/mcp_tools.py``,
 ``simulations/hotels/mcp_tools.py``, ``simulations/cars/mcp_tools.py``,
-``simulations/events/mcp_tools.py`` and ``world/mcp_tools.py`` -- the world
+``simulations/events/mcp_tools.py``, ``simulations/dining/mcp_tools.py`` and ``world/mcp_tools.py`` -- the world
 clock's controls, deliberately a server of their own).
 This file defines no tools itself; it is just the one place ``cli.py`` looks
 to find every domain that exists.
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from .simulations.cars.mcp_tools import mcp as cars_mcp
 from .simulations.delivery.mcp_tools import mcp as delivery_mcp
+from .simulations.dining.mcp_tools import mcp as dining_mcp
 from .simulations.events.mcp_tools import mcp as events_mcp
 from .simulations.flights.mcp_tools import mcp as flights_mcp
 from .simulations.hotels.mcp_tools import mcp as hotels_mcp
@@ -25,6 +26,7 @@ SERVERS = {
     "hotels": hotels_mcp,
     "cars": cars_mcp,
     "events": events_mcp,
+    "dining": dining_mcp,
     "world": world_mcp,
 }
 
@@ -32,7 +34,8 @@ SERVERS = {
 def combined_app(host: str = "127.0.0.1"):
     """One Starlette app, one process, one port -- each domain still its own
     MCP endpoint at its own path (``/flights/mcp``, ``/delivery/mcp``,
-    ``/hotels/mcp``, ``/cars/mcp``, ``/events/mcp``, ``/world/mcp``).
+    ``/hotels/mcp``, ``/cars/mcp``, ``/events/mcp``, ``/dining/mcp``,
+    ``/world/mcp``).
 
     This is a multi-domain *host*, not a gateway: it does not merge tool
     lists or proxy calls between domains. A client connects to exactly one
