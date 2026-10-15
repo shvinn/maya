@@ -6,7 +6,7 @@ step, no priced offer to expire, and no payments domain behind it -- the
 total is informational, the same shallow way flights' total_price is today.
 
 Status is never stored -- it is computed live from elapsed time since
-placed_at, the same way flights computes seat availability from time to
+the kitchen started (prep_starts_at), the same way flights computes seat availability from time to
 departure rather than storing it. An order is PREPARING for
 vendor.prep_minutes, then OUT_FOR_DELIVERY for courier_minutes (the road
 distance between the vendor's zone and the delivery zone, from
@@ -14,8 +14,15 @@ world.geography.maps), then DELIVERED. CANCELLED is the one state that is
 actually persisted, since it overrides whatever the clock would otherwise
 say.
 
-Cancellation is only possible while an order is still PREPARING -- once a
-courier has picked it up, it can't be recalled. A ghost_kitchen vendor's
+An order can be scheduled ahead with ``deliver_at``, up to
+``SCHEDULE_AHEAD_DAYS`` out and no sooner than the ETA allows. It is
+SCHEDULED until the kitchen starts on it -- prep and courier time before
+``deliver_at`` -- and then runs the same PREPARING -> OUT_FOR_DELIVERY ->
+DELIVERED course, arriving at ``deliver_at``. An order placed for now starts
+at once.
+
+Cancellation is only possible while an order is SCHEDULED or still
+PREPARING -- once a courier has picked it up, it can't be recalled. A ghost_kitchen vendor's
 near-zero prep_minutes therefore makes its orders mechanically almost
 impossible to cancel: not a special rule, just what falls out of the
 timing, the same way Puffin Air's fares are non-refundable by a hardcoded
@@ -35,6 +42,11 @@ from . import db, vendors
 from .menu import BY_ITEM_ID
 
 CURRENCY = vendors.CURRENCY
+
+#: How far ahead an order can be scheduled.
+SCHEDULE_AHEAD_DAYS = 7
+
+_TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 def _get_order(order_id: str) -> dict | None:
@@ -75,8 +87,11 @@ def _status(order: dict) -> str:
     only value that's actually stored, as a terminal override."""
     if order["cancelled"]:
         return "CANCELLED"
-    placed_at = datetime.strptime(order["placed_at"], "%Y-%m-%d %H:%M:%S")
-    elapsed_minutes = (clock.now() - placed_at) / timedelta(minutes=1)
+    # records stored before scheduling existed start when they were placed
+    starts_at = datetime.strptime(order.get("prep_starts_at", order["placed_at"]), _TIME_FORMAT)
+    elapsed_minutes = (clock.now() - starts_at) / timedelta(minutes=1)
+    if elapsed_minutes < 0:
+        return "SCHEDULED"
     if elapsed_minutes < order["prep_minutes"]:
         return "PREPARING"
     if elapsed_minutes < order["prep_minutes"] + order["courier_minutes"]:
@@ -92,9 +107,11 @@ def _with_live_status(order: dict) -> dict:
     return out
 
 
-def _place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phone: str) -> dict:
-    """Confirm an order at one vendor. Raises VendorNotFound, ItemNotFound or
-    ZoneNotDeliverable."""
+def _place(
+    vendor_code: str, items: list[dict], delivery_zone: str, contact_phone: str, deliver_at: str | None = None
+) -> dict:
+    """Confirm an order at one vendor, for now or for ``deliver_at``. Raises
+    VendorNotFound, ItemNotFound, ZoneNotDeliverable or InvalidDeliveryTime."""
     vendor = vendors.get(vendor_code)
     if vendor is None:
         raise VendorNotFound(f"No vendor with code {vendor_code!r}.")
@@ -122,7 +139,25 @@ def _place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phon
         subtotal += item.price * quantity
 
     courier_minutes = maps.distance_minutes(vendor.zone, zone.code)
+    eta_minutes = vendor.prep_minutes + courier_minutes
     total = subtotal + vendor.delivery_fee
+
+    now = clock.now().replace(microsecond=0)
+    prep_starts_at = now
+    if deliver_at:
+        try:
+            arrival = datetime.strptime(deliver_at.strip(), "%Y-%m-%d %H:%M")
+        except ValueError:
+            raise InvalidDeliveryTime(f"deliver_at {deliver_at!r} is not in YYYY-MM-DD HH:MM form.") from None
+        earliest = now + timedelta(minutes=eta_minutes)
+        if arrival < earliest:
+            raise InvalidDeliveryTime(
+                f"{vendor.name} needs {eta_minutes} minutes to reach {zone.name}; the earliest "
+                f"delivery is {earliest:%Y-%m-%d %H:%M}."
+            )
+        if arrival > now + timedelta(days=SCHEDULE_AHEAD_DAYS):
+            raise InvalidDeliveryTime(f"Orders can be scheduled at most {SCHEDULE_AHEAD_DAYS} days ahead.")
+        prep_starts_at = arrival - timedelta(minutes=eta_minutes)
 
     order = {
         "order_id": (reference := _next_order_id()),
@@ -141,17 +176,21 @@ def _place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phon
         "total_price": {"amount": total, "currency": CURRENCY},
         "prep_minutes": vendor.prep_minutes,
         "courier_minutes": courier_minutes,
-        "eta_minutes": vendor.prep_minutes + courier_minutes,
-        "placed_at": clock.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "eta_minutes": eta_minutes,
+        "placed_at": now.strftime(_TIME_FORMAT),
+        "prep_starts_at": prep_starts_at.strftime(_TIME_FORMAT),
+        "deliver_at": (prep_starts_at + timedelta(minutes=eta_minutes)).strftime(_TIME_FORMAT),
     }
     _save_order(order)
     return _with_live_status(order)
 
-def place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phone: str) -> dict:
+def place(
+    vendor_code: str, items: list[dict], delivery_zone: str, contact_phone: str, deliver_at: str | None = None
+) -> dict:
     """Place atomically: every check and write below happens in one
     transaction (see maya.storage.transaction)."""
     with storage.transaction(db.connect()):
-        return _place(vendor_code, items, delivery_zone, contact_phone)
+        return _place(vendor_code, items, delivery_zone, contact_phone, deliver_at)
 
 
 def get(order_id: str) -> dict | None:
@@ -171,8 +210,8 @@ def list_all(phone: str | None = None, status: str | None = None) -> list[dict]:
 
 
 def _cancel(order_id: str) -> dict:
-    """Cancel an order. Only possible while it is still PREPARING; once a
-    courier has it, it can't be recalled."""
+    """Cancel an order. Only possible while it is SCHEDULED or still
+    PREPARING; once a courier has it, it can't be recalled."""
     order = _get_order((order_id or "").strip().upper())
     if order is None:
         raise NotFound(f"No order with reference {order_id!r}.")
@@ -180,7 +219,7 @@ def _cancel(order_id: str) -> dict:
     current_status = _status(order)
     if current_status == "CANCELLED":
         raise AlreadyCancelled(f"Order {order['order_id']} is already cancelled.")
-    if current_status != "PREPARING":
+    if current_status not in ("SCHEDULED", "PREPARING"):
         raise TooLateToCancel(
             f"Order {order['order_id']} is already "
             f"{current_status.replace('_', ' ').lower()}; cancellation is only "
@@ -232,6 +271,11 @@ class ItemNotFound(OrderError):
 class ZoneNotDeliverable(OrderError):
     code = "zone_not_deliverable"
     hint = "Choose a delivery zone within the deliverable area."
+
+
+class InvalidDeliveryTime(OrderError):
+    code = "invalid_delivery_time"
+    hint = "Use YYYY-MM-DD HH:MM in Maya time, no sooner than the ETA allows and within a week. Omit it to deliver now."
 
 
 class NotFound(OrderError):
