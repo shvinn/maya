@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from maya.world import places
+from maya.world.geography import maps
 
 from . import vendors
 
@@ -73,6 +74,7 @@ def _result(item: MenuItem) -> dict:
     out = item.to_dict()
     out["vendor_name"] = vendor.name if vendor else item.vendor
     out["zone"] = vendor.zone if vendor else None
+    out["zone_name"] = maps.BY_CODE[vendor.zone].name if vendor else None
     return out
 
 

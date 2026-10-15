@@ -246,6 +246,7 @@ def _book(code: str, day_text: str, time_text: str, party_size: int, guest_name:
         "restaurant_code": restaurant.code,
         "restaurant_name": restaurant.name,
         "zone": restaurant.zone,
+        "zone_name": maps.BY_CODE[restaurant.zone].name,
         "date": day.isoformat(),
         "time": f"{slot:%H:%M}",
         "start": f"{slot:%Y-%m-%d %H:%M}",

@@ -23,6 +23,7 @@ from datetime import date, datetime, time, timedelta
 from typing import NamedTuple
 
 from maya.world import places
+from maya.world.geography import maps
 
 from . import db
 
@@ -85,6 +86,7 @@ class DiningRestaurant(NamedTuple):
             "code": self.code,
             "name": self.name,
             "zone": self.zone,
+            "zone_name": maps.BY_CODE[self.zone].name,
             "cuisine": self.cuisine,
             "style": self.style,
             "opens": f"{self.opens:%H:%M}",

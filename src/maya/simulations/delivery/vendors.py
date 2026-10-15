@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import NamedTuple
 
 from maya.world import places
+from maya.world.geography import maps
 
 from . import db
 
@@ -40,6 +41,7 @@ class Vendor(NamedTuple):
             "code": self.code,
             "name": self.name,
             "zone": self.zone,
+            "zone_name": maps.BY_CODE[self.zone].name,
             "cuisine": self.cuisine,
             "style": self.style,
             "prep_minutes": self.prep_minutes,

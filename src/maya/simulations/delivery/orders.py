@@ -130,6 +130,8 @@ def _place(vendor_code: str, items: list[dict], delivery_zone: str, contact_phon
         "cancelled": False,
         "vendor_code": vendor.code,
         "vendor_name": vendor.name,
+        "vendor_zone": vendor.zone,
+        "vendor_zone_name": maps.BY_CODE[vendor.zone].name,
         "items": lines,
         "delivery_zone": zone.code,
         "delivery_zone_name": zone.name,

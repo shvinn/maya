@@ -47,7 +47,7 @@ def test_the_menu_is_the_same_one_delivery_sells():
 def test_search_by_zone_name_and_cuisine():
     found = t.dining_search_restaurants(zone="Lantern Market", cuisine="indian")
     assert {r["code"] for r in found} >= {"SRC", "TDA"}
-    assert all(r["zone"] == "AIR-MKT" for r in found)
+    assert all(r["zone"] == "AIR-MKT" and r["zone_name"] == "Lantern Market" for r in found)
     assert error_code(t.dining_search_restaurants(zone="Atlantis")) == "not_found"
 
 
