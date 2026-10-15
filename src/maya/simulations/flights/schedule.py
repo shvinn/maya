@@ -30,13 +30,20 @@ class Airline(NamedTuple):
     style: str
     #: Coins per minute of flight time -- the airline's base price character.
     rate_per_minute: float
+    #: Share of flights that leave on time, and share cancelled outright --
+    #: its reliability character (see operations.py).
+    on_time_rate: float
+    cancel_rate: float
 
 
 def _load_airlines() -> dict[str, Airline]:
     rows = db.connect().execute(
-        "SELECT code, name, style, rate_per_minute FROM airlines"
+        "SELECT code, name, style, rate_per_minute, on_time_rate, cancel_rate FROM airlines"
     ).fetchall()
-    return {r["code"]: Airline(r["code"], r["name"], r["style"], r["rate_per_minute"]) for r in rows}
+    return {
+        r["code"]: Airline(r["code"], r["name"], r["style"], r["rate_per_minute"], r["on_time_rate"], r["cancel_rate"])
+        for r in rows
+    }
 
 
 AIRLINES: dict[str, Airline] = _load_airlines()

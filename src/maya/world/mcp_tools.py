@@ -1,4 +1,4 @@
-"""MCP tools for Maya's world: its clock, and resetting it.
+"""MCP tools for Maya's world: its clock, its luck, and resetting it.
 
 The controls live on their own ``world`` server, meant for whoever runs the
 world (you, or a test harness) rather than the agent being tested -- so an
@@ -11,10 +11,14 @@ from __future__ import annotations
 
 from mcp.server.mcpserver import MCPServer
 
+from datetime import date as Date, timedelta
+
 from maya.reset import reset_world
+from maya.simulations.flights import operations, schedule
 from maya.tool_errors import tool_error
 
 from . import clock
+from . import seed as world_seed
 
 mcp = MCPServer("maya-world")
 
@@ -70,13 +74,59 @@ def world_advance_time(minutes: float = 0, hours: float = 0, days: float = 0) ->
 
 
 @mcp.tool()
-def world_reset() -> dict:
+def world_reset(seed: int | None = None) -> dict:
     """Start the world over: empty every domain's bookings, orders, rentals,
-    tickets and reservations, and return Maya time to real time.
+    tickets and reservations, return Maya time to real time, and reseed the
+    world's luck (which flights are delayed or cancelled).
 
     The only way time goes backwards -- bookings and the clock reset
     together, so nothing is left dated in a future that hasn't happened.
-    Reference data (airports, hotels, menus, shows) is untouched. Returns
-    how many records each domain had.
+    Pass ``seed`` to replay a world exactly; leave it out for a new one
+    (MAYA_SEED, if set, else random). Reference data (airports, hotels,
+    menus, shows) is untouched. Returns how many records each domain had
+    and the new seed.
     """
-    return {"cleared": reset_world(), **clock.state()}
+    cleared = reset_world(seed)
+    return {"cleared": cleared, "seed": world_seed.get(), **clock.state()}
+
+
+@mcp.tool()
+def world_get_seed() -> dict:
+    """This world's seed. Reset with it to replay the same delays and
+    cancellations. Keep it from the agent under test: with it, every future
+    delay could be worked out."""
+    return {"seed": world_seed.get()}
+
+
+@mcp.tool()
+def world_set_flight_status(
+    flight_number: str, date: str, delay_minutes: int = 0, cancelled: bool = False
+) -> dict:
+    """Decide what happens to one flight on one date (YYYY-MM-DD), replacing
+    chance: ``cancelled=true``, a ``delay_minutes`` (up to a day), or
+    neither for on time.
+
+    It's announced like any other disruption -- a cancellation 24 hours
+    before departure, a delay 3 hours before -- so move the clock forward to
+    see it. A reset drops every override.
+    """
+    try:
+        day = Date.fromisoformat(date)
+    except ValueError:
+        return tool_error("invalid_request", f"{date!r} is not a YYYY-MM-DD date.")
+    flight = schedule.find(flight_number, day)
+    if flight is None:
+        return tool_error("not_found", f"{flight_number} does not operate on {date}.",
+                          "Check the flight number and date against the timetable.")
+    try:
+        operations.override(flight, delay_minutes, cancelled)
+    except operations.InvalidOverride as e:
+        return tool_error(e.code, str(e), e.hint)
+    notice = operations.CANCELLATION_NOTICE_HOURS if cancelled else operations.DELAY_NOTICE_HOURS
+    return {
+        "flight_number": flight.flight_number,
+        "date": day.isoformat(),
+        "cancelled": cancelled,
+        "delay_minutes": delay_minutes,
+        "announced_from": f"{flight.departure - timedelta(hours=notice):%Y-%m-%d %H:%M}",
+    }

@@ -62,6 +62,42 @@ before departure (the first leg's departure, for a connection), and cancellation
 (`flights_cancel_booking` fails with `too_late_to_cancel`, not a partial
 refund). There's no middle case.
 
+## Flights run late and get cancelled — check, nothing tells you
+
+Each airline has its own reliability: Aira Express is on time about 92% of
+the time, Maya Air 80%, Coral Wings 70% (and cancels the most), Puffin Air
+60%. Delays run from 15 minutes to 4 hours, most under an hour.
+
+A flight's fate is hidden until the airline would announce it: a
+cancellation **24 hours** before departure, a delay **3 hours** before.
+Before that it's `SCHEDULED` — no news, not a promise. Nothing is pushed:
+an agent that booked on Monday only learns on Saturday by asking —
+`flights_get_flight_status`, `flights_get_booking` (each leg's
+`flight_status`, `delay_minutes`, estimated times, and the booking's
+`disruption`), or a new search. Statuses run `SCHEDULED` / `DELAYED` /
+`CANCELLED`, then `DEPARTED` and `LANDED` at the estimated times.
+
+Once known, a cancelled flight can't be booked (`flight_cancelled`) and
+drops out of search, as does a connection a delay has broken; search counts
+both in `cancelled_or_misconnecting`.
+
+## When the airline lets you down, the fare rules give way
+
+A booking whose `disruption` is `FLIGHT_CANCELLED` can be cancelled for a
+full refund at any time; one with `MISSED_CONNECTION` (the first flight now
+lands too late for the second) or `LONG_DELAY` (3 hours or more) until its
+first flight leaves. That holds for Puffin Air too, and inside the usual 24
+hours. A plain `DELAYED` changes nothing. There's no automatic rebooking:
+cancel and book again.
+
+## Luck is per world
+
+Which flights go wrong is drawn from the world seed, so it's consistent
+within a world — ask twice, same answer — but a reset brings new luck. The
+same flight on the same date isn't late in every world, and there's no
+weekly pattern to learn. Whoever runs the world can pin the seed or set one
+flight's fate (see "World controls" in the repo README); the agent can't.
+
 ## The world is small and fixed
 
 10 airports, 4 airlines, one weekly timetable. A route or carrier not in

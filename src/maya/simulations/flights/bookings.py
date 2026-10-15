@@ -23,6 +23,12 @@ never claims the last ``BACKGROUND_DEMAND_FLOOR_SEATS`` seats until inside
 those out at any time, this floor only stops the background simulation from
 doing it quietly, hours early.
 
+When the airline lets a traveller down, the fare rules give way: a booking
+with a cancelled flight can be cancelled for a full refund at any time, and
+one facing a missed connection or a delay of at least ``LONG_DELAY_MINUTES``
+until its first flight leaves -- Puffin Air included, and inside 24 hours. Each leg carries its live flight
+status, and the booking a ``disruption`` (see operations.py).
+
 Fares are computed, not stored: an airline's ``rate_per_minute`` (its price
 character -- Puffin cheap, Aira Express dear) times the flight's duration
 (the distance stand-in), nudged up by up to ``PRICE_SURGE_MAX`` as the flight
@@ -43,7 +49,7 @@ from datetime import datetime, timedelta
 from maya import storage
 from maya.world import clock
 
-from . import db
+from . import db, operations, schedule
 from .schedule import AIRCRAFT, AIRLINES, CURRENCY, ScheduledFlight
 
 #: Record locators skip letters that look like digits.
@@ -51,6 +57,9 @@ _ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
 REFUND_CUTOFF_HOURS = 24
 NON_REFUNDABLE_AIRLINES = ("PF",)
+
+#: A delay this long lets the traveller cancel for a full refund.
+LONG_DELAY_MINUTES = 180
 
 #: How far out a flight starts looking untouched by other travellers.
 BACKGROUND_DEMAND_HORIZON_DAYS = 45
@@ -236,10 +245,37 @@ def book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email:
         return _book(legs, passenger_names, contact_email)
 
 
+def _flight(leg: dict) -> ScheduledFlight | None:
+    return schedule.find(leg["flight_number"], datetime.strptime(leg["date"], "%Y-%m-%d").date())
+
+
+def disruption(booking: dict) -> str | None:
+    """FLIGHT_CANCELLED, MISSED_CONNECTION, LONG_DELAY or DELAYED -- the
+    worst that's known now about a booking's flights -- or None."""
+    flights = [_flight(leg) for leg in _legs(booking)]
+    if any(f is None for f in flights):
+        return None
+    statuses = [operations.status(f) for f in flights]
+    if any(s.cancelled for s in statuses):
+        return "FLIGHT_CANCELLED"
+    if len(flights) == 2 and operations.misconnects(*flights):
+        return "MISSED_CONNECTION"
+    worst = max(s.delay_minutes for s in statuses)
+    if worst >= LONG_DELAY_MINUTES:
+        return "LONG_DELAY"
+    return "DELAYED" if worst else None
+
+
 def _public(booking: dict) -> dict:
-    """A stored booking as returned to callers, with the shared ``reference``
-    key filled in for records stored before it existed."""
+    """A stored booking as returned to callers: each leg with its live
+    flight status, the booking's ``disruption``, and the shared
+    ``reference`` key filled in for records stored before it existed."""
     booking.setdefault("reference", booking["booking_reference"])
+    for leg in booking.get("legs") or []:
+        flight = _flight(leg)
+        if flight is not None:
+            leg.update(operations.status(flight).to_dict())
+    booking["disruption"] = None if booking["status"] == "CANCELLED" else disruption(booking)
     return booking
 
 
@@ -262,12 +298,24 @@ def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
 def _cancel(reference: str) -> dict:
     """Cancel a booking. Puffin Air fares can never be cancelled. Everyone
     else can cancel for a full refund any time up to 24 hours before
-    departure; inside that window cancellation isn't possible at all."""
-    booking = get(reference)
+    departure; inside that window cancellation isn't possible at all. A
+    cancelled flight, missed connection or long delay overrides both rules."""
+    booking = _get_booking((reference or "").strip().upper())
     if booking is None:
         raise NotFound(f"No booking with reference {reference!r}.")
     if booking["status"] == "CANCELLED":
         raise AlreadyCancelled(f"Booking {booking['booking_reference']} is already cancelled.")
+
+    disrupted = disruption(booking)
+    first = _flight(_legs(booking)[0])
+    if disrupted in ("MISSED_CONNECTION", "LONG_DELAY") and first and operations.status(first).status in ("DEPARTED", "LANDED"):
+        disrupted = None  # the traveller flew; a delay no longer refunds
+    if disrupted in ("FLIGHT_CANCELLED", "MISSED_CONNECTION", "LONG_DELAY"):
+        return _release(booking, {
+            "FLIGHT_CANCELLED": "The airline cancelled a flight on this booking: full refund.",
+            "MISSED_CONNECTION": "A delay means the connection can't be made: full refund.",
+            "LONG_DELAY": f"A delay of {LONG_DELAY_MINUTES // 60} hours or more: full refund.",
+        }[disrupted])
 
     for leg in _legs(booking):
         if not is_refundable(leg["airline"]):
@@ -281,7 +329,11 @@ def _cancel(reference: str) -> dict:
             f"{max(hours_left, 0):.1f} hour(s); cancellation is only possible "
             f"more than {REFUND_CUTOFF_HOURS} hours before departure."
         )
+    return _release(booking, f"Cancelled more than {REFUND_CUTOFF_HOURS} hours before departure: full refund.")
 
+
+def _release(booking: dict, reason: str) -> dict:
+    """Mark a booking cancelled, give its seats back and refund it in full."""
     booking["status"] = "CANCELLED"
     for leg in _legs(booking):
         _adjust_seats_sold(f"{leg['flight_number']}/{leg['date']}", -booking["passenger_count"])
@@ -294,7 +346,7 @@ def _cancel(reference: str) -> dict:
         "reference": booking["booking_reference"],
         "status": "CANCELLED",
         "refund": {"amount": amount, "currency": CURRENCY},
-        "reason": f"Cancelled more than {REFUND_CUTOFF_HOURS} hours before departure: full refund.",
+        "reason": reason,
     }
 
 def cancel(reference: str) -> dict:

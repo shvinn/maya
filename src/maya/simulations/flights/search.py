@@ -8,6 +8,10 @@ the answer is that there is no flight.
 
 Fares are not stored -- see ``bookings.price_per_passenger`` for how they are
 computed from the airline's rate, flight duration and how full the flight is.
+
+Every flight carries its live status (see ``operations.py``). Options with
+a cancelled flight, or a connection a delay has broken, can't be sold: they
+are left out and counted, like full flights.
 """
 
 from __future__ import annotations
@@ -15,7 +19,7 @@ from __future__ import annotations
 from datetime import date as Date
 from typing import Iterable
 
-from . import bookings, connections
+from . import bookings, connections, operations, schedule
 from .airports import resolve as resolve_airport
 from .schedule import AIRLINES, CURRENCY, ScheduledFlight, flights_on
 
@@ -54,6 +58,7 @@ def _leg(flight: ScheduledFlight) -> dict:
     leg = flight.to_dict()
     leg["price_per_passenger"] = {"amount": bookings.price_per_passenger(flight), "currency": CURRENCY}
     leg["seats_available"] = bookings.seats_available(flight)
+    leg.update(operations.status(flight).to_dict())
     return leg
 
 
@@ -66,6 +71,7 @@ def _option(flight: ScheduledFlight, passengers: int) -> dict:
     option["price_per_passenger"] = {"amount": fare, "currency": CURRENCY}
     option["total_price"] = {"amount": fare * passengers, "currency": CURRENCY}
     option["seats_available"] = bookings.seats_available(flight)
+    option.update(operations.status(flight).to_dict())
     option["legs"] = [_leg(flight)]
     return option
 
@@ -132,6 +138,9 @@ def search(
     if airline:
         wanted = resolve_airline(airline)
         options = [o for o in options if all(leg["airline"] == wanted for leg in o["legs"])]
+    operating = len(options)
+    options = [o for o in options if not _disrupted(o)]
+    disrupted = operating - len(options)
     scheduled = len(options)
     options = [o for o in options if o["seats_available"] >= passengers]
     full = scheduled - len(options)
@@ -159,22 +168,39 @@ def search(
         "options": options[:limit],
         "not_enough_seats": full,
         "over_max_price": over_price,
+        "cancelled_or_misconnecting": disrupted,
         "summary": _summarise(
             origin, destination, day, options, max_stops, passengers, full, over_price,
-            AIRLINES[wanted].name if airline else None,
+            AIRLINES[wanted].name if airline else None, disrupted,
         ),
     }
+
+
+def _disrupted(option: dict) -> bool:
+    """A cancelled flight, or a connection whose first flight now lands too
+    late for the second -- neither can be sold."""
+    if any(leg["flight_status"] == "CANCELLED" for leg in option["legs"]):
+        return True
+    if option["stops"] == 1:
+        first, second = (
+            schedule.find(leg["flight_number"], Date.fromisoformat(leg["date"])) for leg in option["legs"]
+        )
+        return operations.misconnects(first, second)
+    return False
 
 
 def _summarise(
     origin: str, destination: str, day: Date, options: Iterable[dict], max_stops: int,
     passengers: int = 1, full: int = 0, over_price: int = 0, airline: str | None = None,
+    disrupted: int = 0,
 ) -> str:
     """Say what was found and, above all, why anything wasn't -- full
     flights and price limits included -- so an agent doesn't mistake a full
     flight for a route that doesn't fly."""
     options = list(options)
     left_out = []
+    if disrupted:
+        left_out.append(f"{disrupted} cancelled by the airline or missing their connection")
     if full:
         left_out.append(f"{full} without {passengers} seat(s) left")
     if over_price:
