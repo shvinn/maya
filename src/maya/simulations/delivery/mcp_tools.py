@@ -85,9 +85,10 @@ def delivery_place_order(
     items: list[dict],
     delivery_zone: str,
     contact_phone: str,
+    deliver_at: str | None = None,
 ) -> dict:
-    """Place an order at one vendor. Confirms immediately -- there is no
-    separate hold-then-pay step.
+    """Place an order at one vendor, to arrive now or at a set time. Confirms
+    immediately -- there is no separate hold-then-pay step.
 
     ``items`` is a list of {"item_id": ..., "quantity": ...} using item ids
     from delivery_get_menu or delivery_search_menu_items. ``delivery_zone``
@@ -95,9 +96,15 @@ def delivery_place_order(
     deliverable area. ``total_price`` includes the vendor's delivery fee.
     ``eta_minutes`` is prep time plus courier travel time from the vendor's
     zone to the delivery zone.
+
+    ``deliver_at`` (YYYY-MM-DD HH:MM, Maya time) schedules the order to
+    arrive then, up to 7 days ahead; it must be at least ``eta_minutes``
+    away, or the order fails with invalid_delivery_time. Leave it out to
+    deliver as soon as possible. A scheduled order is SCHEDULED until the
+    kitchen starts on it.
     """
     try:
-        return orders.place(vendor_code, items, delivery_zone, contact_phone)
+        return orders.place(vendor_code, items, delivery_zone, contact_phone, deliver_at)
     except orders.OrderError as e:
         return _error(e.code, str(e), e.hint)
 
@@ -123,15 +130,16 @@ def delivery_get_order(order_id: str) -> dict:
 def delivery_list_orders(phone: str | None = None, status: str | None = None) -> list[dict]:
     """List orders, optionally filtered by contact phone or status.
 
-    ``status`` is one of "PREPARING", "OUT_FOR_DELIVERY", "DELIVERED",
-    "CANCELLED" -- computed live, not stored.
+    ``status`` is one of "SCHEDULED", "PREPARING", "OUT_FOR_DELIVERY",
+    "DELIVERED", "CANCELLED" -- computed live, not stored.
     """
     return orders.list_all(phone, status)
 
 
 @mcp.tool()
 def delivery_cancel_order(order_id: str) -> dict:
-    """Cancel an order. Only possible while it is still PREPARING.
+    """Cancel an order. Only possible while it is SCHEDULED or still
+    PREPARING.
 
     Once a courier has picked it up (OUT_FOR_DELIVERY or later), this fails
     with too_late_to_cancel rather than silently doing nothing. A
