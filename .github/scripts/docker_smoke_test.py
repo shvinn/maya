@@ -22,7 +22,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
 
-DOMAINS = ("flights", "delivery", "hotels", "cars", "events", "world")
+DOMAINS = ("flights", "delivery", "hotels", "cars", "events", "dining", "world")
 #: Every server also carries the world clock's read-only tool.
 SHARED_TOOLS = {"world_get_time"}
 STARTUP_TIMEOUT_SECONDS = 30

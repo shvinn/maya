@@ -4,13 +4,14 @@ Own connection, own tables -- kept separate from flights/db.py on purpose,
 same reasoning flights already follows for itself: one domain's schema
 changes should never risk breaking another's. Both write to the same
 maya.db file; SQLite handles independent connections to one file fine, and
-the table names here (vendors, menu_items, orders) don't collide with
+the table names here (delivery_vendors, orders) don't collide with
 flights' (airports, airlines, aircraft, schedule, bookings, seats_sold).
 
-Reference data (vendors, menu items) lives in the CSV files under data/ --
-that is the source of truth for it, not the database, and it is meant to be
-readable and editable directly. Every process start reloads those tables
-from CSV.
+Reference data (each delivering restaurant's prep time and fee) lives in
+the CSV files under data/ -- that is the source of truth for it, not the
+database, and it is meant to be readable and editable directly. Every
+process start reloads those tables from CSV. The restaurants themselves and
+their menus aren't delivery's: they live in world.places.
 
 Orders are different: that is real state, and the whole point of this
 module is that it survives a restart. That table is never cleared except by
@@ -33,11 +34,10 @@ DB_PATH = storage.db_path()
 DATA_DIR = Path(__file__).resolve().parent / "data"
 
 #: Column name -> converter, applied when a CSV cell isn't already a string.
-_CONVERTERS = {"prep_minutes": int, "delivery_fee": int, "price": int}
+_CONVERTERS = {"prep_minutes": int, "delivery_fee": int}
 
 _REFERENCE_TABLES = {
-    "vendors": ("code", "name", "zone", "cuisine", "style", "prep_minutes", "delivery_fee"),
-    "menu_items": ("item_id", "vendor", "name", "category", "price", "diet"),
+    "delivery_vendors": ("code", "prep_minutes", "delivery_fee"),
 }
 
 
@@ -74,14 +74,12 @@ def connect() -> sqlite3.Connection:
 def _init(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
-        CREATE TABLE IF NOT EXISTS vendors (
-            code TEXT PRIMARY KEY, name TEXT NOT NULL, zone TEXT NOT NULL,
-            cuisine TEXT NOT NULL, style TEXT NOT NULL,
+        -- Restaurants and menus now live in world.places.
+        DROP TABLE IF EXISTS vendors;
+        DROP TABLE IF EXISTS menu_items;
+        CREATE TABLE IF NOT EXISTS delivery_vendors (
+            code TEXT PRIMARY KEY,
             prep_minutes INTEGER NOT NULL, delivery_fee INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS menu_items (
-            item_id TEXT PRIMARY KEY, vendor TEXT NOT NULL, name TEXT NOT NULL,
-            category TEXT NOT NULL, price INTEGER NOT NULL, diet TEXT NOT NULL
         );
         CREATE TABLE IF NOT EXISTS orders (
             order_id TEXT PRIMARY KEY, data TEXT NOT NULL

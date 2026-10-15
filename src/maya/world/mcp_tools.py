@@ -71,8 +71,8 @@ def world_advance_time(minutes: float = 0, hours: float = 0, days: float = 0) ->
 
 @mcp.tool()
 def world_reset() -> dict:
-    """Start the world over: empty every domain's bookings, orders, rentals
-    and tickets, and return Maya time to real time.
+    """Start the world over: empty every domain's bookings, orders, rentals,
+    tickets and reservations, and return Maya time to real time.
 
     The only way time goes backwards -- bookings and the clock reset
     together, so nothing is left dated in a future that hasn't happened.

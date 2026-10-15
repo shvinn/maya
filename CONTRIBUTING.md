@@ -21,8 +21,9 @@ Standard `src/` layout: `src/maya/` is the one installable package.
   into one registry that `cli.py` dispatches by name. Neither defines any
   tools itself.
 - `src/maya/world/` is shared, domain-agnostic world data and machinery —
-  Aira's zones and road graph, and the world clock (`clock.py`) with its
-  `world` MCP server. **Always read the time with `maya.world.clock.now()`,
+  Aira's zones and road graph, its restaurants and their menus (`places/`;
+  each service, like delivery, keeps only its own terms keyed by restaurant
+  code), and the world clock (`clock.py`) with its `world` MCP server. **Always read the time with `maya.world.clock.now()`,
   never `datetime.now()`** — it's Maya time (MYT), and it can be moved
   ahead; a test fails if a domain reads the host clock.
 - `src/maya/storage.py` decides where `maya.db` lives and provides
@@ -31,7 +32,7 @@ Standard `src/` layout: `src/maya/` is the one installable package.
   it), so concurrent requests can't oversell or issue the same reference.
   Report refusals with `maya.tool_errors.tool_error`, so they reach clients
   as MCP tool errors.
-- Reference data (airports and the weekly schedule, vendors and menus,
+- Reference data (airports and the weekly schedule, delivery terms,
   hotels and room types, the rental fleet, venues and event series) lives in each domain's
   `data/*.csv` — human-editable, reloaded into SQLite on every start. Edit a
   row there and the world changes; no code change needed.

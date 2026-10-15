@@ -72,7 +72,7 @@ def delivery_search_menu_items(
 
     Each result carries its vendor's code, name and zone alongside the item,
     so you can go straight to delivery_place_order without a second lookup.
-    ``category`` is one of "main", "side", "drink", "dessert". ``diet`` is
+    ``category`` is one of "starter", "main", "side", "dessert", "drink". ``diet`` is
     one of "vegan", "vegetarian", "non_veg". An empty query returns items
     across all vendors, still subject to any category/diet filters given.
     """

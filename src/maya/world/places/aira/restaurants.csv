@@ -1,0 +1,39 @@
+code,name,zone,cuisine,style
+OQN,Old Quarter Noodle House,AIR-OLD,Chinese,home_kitchen
+LTH,The Lantern Teahouse,AIR-OLD,Japanese,chain
+CBS,Capitol Bakery & Sandwiches,AIR-CAP,Italian,chain
+HBC,Harbor Catch,AIR-PRT,Mediterranean,bistro
+DKF,Dockside Fry,AIR-PRT,Fried fish & chips,ghost_kitchen
+QBB,QuickBite Bowls,AIR-FIN,Mexican,ghost_kitchen
+LDG,The Ledger Grill,AIR-FIN,Grilled/steak,chain
+MKS,Market Skewers,AIR-MKT,Thai,home_kitchen
+SRC,Spice Route Curry House,AIR-MKT,Indian,chain
+GDS,Golden Dumpling Stall,AIR-MKT,Dumplings,home_kitchen
+NIT,Northern Isles Table,AIR-EMB,Outer-isles cuisine,bistro
+CSK,Cross-Strait Kitchen,AIR-EMB,Border-country fusion,chain
+RHK,Riverside Home Kitchen,AIR-RIV,Home-style comfort food,home_kitchen
+AHG,Afterhours Grill,AIR-CRN,Late-night bar food,ghost_kitchen
+SGG,Skyview Grab & Go,AIR-APT,Sandwiches/grab-and-go,chain
+GWE,Golden Wok Express,AIR-OLD,Chinese,ghost_kitchen
+TDA,Tandoor Alley,AIR-MKT,Indian,home_kitchen
+SGS,Saigon Streetside,AIR-MKT,Vietnamese,chain
+CAN,Casa Ánimo,AIR-FIN,Mexican,bistro
+FBP,Firebrick Pizzeria,AIR-RIV,Pizza,chain
+VNT,Vinewood Trattoria,AIR-CAP,Pasta,chain
+HEG,Hanok Ember Grill,AIR-CRN,Korean,bistro
+HIT,Highland Injera Table,AIR-RIV,Ethiopian,home_kitchen
+CDC,Cedar Courtyard,AIR-EMB,Lebanese,bistro
+BST,Blue Shutter Taverna,AIR-PRT,Greek,bistro
+TPC,Tidepool Cevicheria,AIR-PRT,Peruvian,bistro
+STH,Saffron Thali House,AIR-MKT,Gujarati (vegetarian),home_kitchen
+LPK,Lamplight Kitchen,AIR-CAP,French,fine_dining
+EOS,Ember & Oak Smokehouse,AIR-FIN,Barbecue,chain
+ANC,Anchor Lane Tapas,AIR-OLD,Spanish,bistro
+LTS,Lantern Tide Sushi,AIR-FIN,Japanese,bistro
+NOR,Night Owl Ramen,AIR-CRN,Ramen,ghost_kitchen
+SBK,Sprout Box Kitchen,AIR-CAP,Vegan,ghost_kitchen
+CLD,Cloudline Rooftop,AIR-APT,Modern grill,fine_dining
+IHK,Island Hearth Kitchen,AIR-RIV,Caribbean,home_kitchen
+ANH,Anatolia Hearth,AIR-MKT,Turkish,chain
+CLH,Coconut Leaf Dosa Hall,AIR-OLD,South Indian,home_kitchen
+SSP,Sugar & Steam Patisserie,AIR-CAP,Desserts & bakery,chain

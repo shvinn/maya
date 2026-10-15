@@ -54,3 +54,20 @@ def test_every_price_says_its_currency():
     assert menu["vendor"]["currency"] == "bucks"
     assert {item["currency"] for item in menu["items"]} == {"bucks"}
     assert {item["currency"] for item in t.delivery_search_menu_items("noodles")} == {"bucks"}
+
+
+def test_only_restaurants_with_delivery_terms_are_vendors():
+    from maya.world import places
+
+    codes = {v["code"] for v in t.delivery_list_vendors()}
+    assert "NOR" in codes  # a ghost kitchen: delivery only
+    assert "LPK" in places.BY_CODE and "LPK" not in codes  # dine-in only
+    assert t.delivery_get_menu("LPK")["items"] == []
+    assert all(item["vendor"] in codes for item in t.delivery_search_menu_items(limit=1000))
+
+
+def test_zones_come_with_their_names():
+    assert t.delivery_get_menu("LDG")["vendor"]["zone_name"] == "Finance Quarter"
+    assert t.delivery_search_menu_items("sirloin")[0]["zone_name"] == "Finance Quarter"
+    order = place("Portside")
+    assert (order["vendor_zone_name"], order["delivery_zone_name"]) == ("Old Aira", "Portside")

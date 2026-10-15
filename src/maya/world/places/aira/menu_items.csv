@@ -1,0 +1,344 @@
+item_id,restaurant,name,category,price,diet
+OQN-01,OQN,Brothless Ash Noodles,main,14,vegan
+OQN-02,OQN,Central Broth Noodles,main,16,non_veg
+OQN-03,OQN,Pickled Radish,side,4,vegan
+OQN-04,OQN,Iced Barley Tea,drink,3,vegan
+OQN-05,OQN,Red Bean Sesame Balls,dessert,6,vegan
+OQN-06,OQN,Char Siu Pork Bites,starter,6,non_veg
+OQN-07,OQN,Smashed Cucumber Salad,starter,5,vegan
+OQN-08,OQN,Scallion Pancake,starter,6,vegan
+OQN-09,OQN,Chicken Wonton Soup,main,13,non_veg
+LTH-01,LTH,Sencha Green Tea,drink,5,vegan
+LTH-02,LTH,Matcha Milk Tea,drink,6,vegetarian
+LTH-03,LTH,Steamed Pork Buns,main,9,non_veg
+LTH-04,LTH,Sesame Rice Crackers,side,4,vegan
+LTH-05,LTH,Vegetable Gyoza,main,9,vegan
+LTH-06,LTH,Mochi Ice Cream,dessert,6,vegetarian
+LTH-07,LTH,Chicken Karaage Bites,starter,6,non_veg
+LTH-08,LTH,Edamame,starter,4,vegan
+LTH-09,LTH,Agedashi Tofu,starter,6,vegan
+LTH-10,LTH,Teriyaki Salmon Rice Bowl,main,15,non_veg
+CBS-01,CBS,Cured Ham & Cheese Sandwich,main,11,non_veg
+CBS-02,CBS,Roast Vegetable Sandwich,main,10,vegan
+CBS-03,CBS,Almond Biscotti,dessert,5,vegetarian
+CBS-04,CBS,Espresso,drink,4,vegan
+CBS-05,CBS,Prosciutto Bites,starter,7,non_veg
+CBS-06,CBS,Caprese Skewers,starter,6,vegetarian
+CBS-07,CBS,Tomato Bruschetta,starter,6,vegan
+CBS-08,CBS,Chicken Pesto Panini,main,12,non_veg
+CBS-09,CBS,Ricotta Cannoli,dessert,6,vegetarian
+HBC-01,HBC,Grilled Reef Snapper,main,28,non_veg
+HBC-02,HBC,Charred Squid Skewer,main,22,non_veg
+HBC-03,HBC,Olive & Herb Salad,side,6,vegan
+HBC-04,HBC,Citrus Cooler,drink,5,vegan
+HBC-05,HBC,Salted Caramel Tart,dessert,8,vegetarian
+HBC-06,HBC,Grilled Halloumi & Vegetable Skewer,main,19,vegetarian
+HBC-07,HBC,Grilled Chorizo Skewer,starter,7,non_veg
+HBC-08,HBC,Hummus & Warm Pita,starter,6,vegan
+HBC-09,HBC,Garlic Prawns,starter,9,non_veg
+HBC-10,HBC,Lemon Herb Orzo,main,17,vegetarian
+HBC-11,HBC,Baklava,dessert,7,vegetarian
+DKF-01,DKF,Classic Fish & Chips,main,15,non_veg
+DKF-02,DKF,Battered Prawns,main,17,non_veg
+DKF-03,DKF,Mushy Peas,side,3,vegan
+DKF-04,DKF,Malt Vinegar Soda,drink,3,vegan
+DKF-05,DKF,Battered Halloumi & Chips,main,13,vegetarian
+DKF-06,DKF,Battered Sausage,side,5,non_veg
+DKF-07,DKF,Crispy Onion Rings,starter,5,vegetarian
+DKF-08,DKF,Popcorn Shrimp,starter,6,non_veg
+DKF-09,DKF,Banana Fritters,dessert,5,vegan
+QBB-01,QBB,Charred Chicken Grain Bowl,main,13,non_veg
+QBB-02,QBB,Seared Tofu Grain Bowl,main,12,vegan
+QBB-03,QBB,Charred Salsa Side Cup,side,2,vegan
+QBB-04,QBB,Cold Brew,drink,4,vegan
+QBB-05,QBB,Cinnamon Sugar Churro Bites,dessert,5,vegetarian
+QBB-06,QBB,Chorizo Crumble Cup,side,4,non_veg
+QBB-07,QBB,Guacamole & Chips,starter,5,vegan
+QBB-08,QBB,Spiced Black Bean Bowl,main,12,vegan
+QBB-09,QBB,Chipotle Shrimp Bowl,main,14,non_veg
+LDG-01,LDG,Peppercorn Sirloin,main,26,non_veg
+LDG-02,LDG,Grilled Chicken Plate,main,16,non_veg
+LDG-03,LDG,Charred Corn,side,5,vegan
+LDG-04,LDG,House Spiced Cordial,drink,6,vegan
+LDG-05,LDG,Flourless Chocolate Cake,dessert,9,vegetarian
+LDG-06,LDG,Grilled Portobello Steak,main,15,vegan
+LDG-07,LDG,Bacon-Wrapped Asparagus,starter,7,non_veg
+LDG-08,LDG,Crispy Calamari,starter,9,non_veg
+LDG-09,LDG,Wedge Salad,starter,7,vegetarian
+LDG-10,LDG,Cauliflower Steak,main,17,vegan
+MKS-01,MKS,Charcoal Lamb Skewer,main,10,non_veg
+MKS-02,MKS,Chicken Skewer,main,8,non_veg
+MKS-03,MKS,Grilled Corn Skewer,side,4,vegan
+MKS-04,MKS,Sugarcane Juice,drink,3,vegan
+MKS-05,MKS,Grilled Tofu Satay Skewer,main,7,vegan
+MKS-06,MKS,Pork Belly Bites,starter,6,non_veg
+MKS-07,MKS,Green Papaya Salad,starter,6,vegan
+MKS-08,MKS,Thai Fish Cakes,starter,7,non_veg
+MKS-09,MKS,Green Curry with Vegetables,main,11,vegan
+MKS-10,MKS,Mango Sticky Rice,dessert,6,vegan
+SRC-01,SRC,Coconut Fish Curry,main,17,non_veg
+SRC-02,SRC,Lentil Curry,main,12,vegan
+SRC-03,SRC,Saffron Rice,side,5,vegan
+SRC-04,SRC,Mango Lassi,drink,5,vegetarian
+SRC-05,SRC,Gulab Jamun,dessert,6,vegetarian
+SRC-06,SRC,Tandoori Chicken Bites,starter,6,non_veg
+SRC-07,SRC,Vegetable Samosas,starter,5,vegan
+SRC-08,SRC,Onion Bhaji,starter,5,vegan
+SRC-09,SRC,Paneer Tikka Masala,main,14,vegetarian
+SRC-10,SRC,Lamb Rogan Josh,main,18,non_veg
+GDS-01,GDS,Pork & Chive Dumplings,main,9,non_veg
+GDS-02,GDS,Vegetable Dumplings,main,8,vegan
+GDS-03,GDS,Chili Oil Side Cup,side,2,vegan
+GDS-04,GDS,Hot Soy Milk,drink,3,vegan
+GDS-05,GDS,Sesame Seed Balls,dessert,5,vegan
+GDS-06,GDS,Char Siu Bao Bites,starter,5,non_veg
+GDS-07,GDS,Crispy Tofu Wontons,starter,6,vegan
+GDS-08,GDS,Shrimp Har Gow,main,10,non_veg
+GDS-09,GDS,Egg Custard Tarts,dessert,5,vegetarian
+NIT-01,NIT,Smoked Whitefish Plate,main,24,non_veg
+NIT-02,NIT,Cloudberry Compote Cake,dessert,10,vegetarian
+NIT-03,NIT,Rye Flatbread,side,5,vegan
+NIT-04,NIT,Juniper Cordial,drink,6,vegan
+NIT-05,NIT,Roasted Root Vegetable Plate,main,18,vegan
+NIT-06,NIT,Smoked Salmon Bites,starter,8,non_veg
+NIT-07,NIT,Beetroot & Dill Soup,starter,7,vegan
+NIT-08,NIT,Herring on Rye,starter,8,non_veg
+NIT-09,NIT,Venison Stew,main,26,non_veg
+NIT-10,NIT,Mushroom & Barley Risotto,main,19,vegetarian
+CSK-01,CSK,Braised Short Rib Fusion Plate,main,22,non_veg
+CSK-02,CSK,Herb Dumpling Soup,main,14,vegetarian
+CSK-03,CSK,Pickled Vegetable Side,side,4,vegan
+CSK-04,CSK,Ginger Fizz,drink,4,vegan
+CSK-05,CSK,Honey Walnut Cake,dessert,7,vegetarian
+CSK-06,CSK,Beef Skewer Bites,starter,7,non_veg
+CSK-07,CSK,Vegan Kimchi Pancake,starter,7,vegan
+CSK-08,CSK,Five-Spice Duck Bao,starter,9,non_veg
+CSK-09,CSK,Sesame Tofu Rice Plate,main,15,vegan
+RHK-01,RHK,Slow Braised Stew,main,15,non_veg
+RHK-02,RHK,Roast Chicken Plate,main,16,non_veg
+RHK-03,RHK,Mashed Root Vegetables,side,5,vegetarian
+RHK-04,RHK,Homemade Lemonade,drink,3,vegan
+RHK-05,RHK,Vegetable & Barley Stew,main,13,vegan
+RHK-06,RHK,Apple Crumble,dessert,7,vegetarian
+RHK-07,RHK,Pulled Pork Side Cup,side,6,non_veg
+RHK-08,RHK,Tomato Soup & Toast,starter,6,vegetarian
+RHK-09,RHK,Deviled Eggs,starter,5,vegetarian
+RHK-10,RHK,Chicken Pot Pie,main,16,non_veg
+RHK-11,RHK,Baked Macaroni & Cheese,main,12,vegetarian
+AHG-01,AHG,Midnight Burger,main,14,non_veg
+AHG-02,AHG,Spiced Wings,main,12,non_veg
+AHG-03,AHG,Loaded Fries,side,8,vegetarian
+AHG-04,AHG,Ginger Beer,drink,4,vegan
+AHG-05,AHG,Grilled Veggie Burger,main,13,vegetarian
+AHG-06,AHG,Bacon Jalapeno Poppers,starter,7,non_veg
+AHG-07,AHG,Mozzarella Sticks,starter,7,vegetarian
+AHG-08,AHG,Crispy Cauliflower Bites,starter,7,vegan
+AHG-09,AHG,Cheesesteak Sandwich,main,15,non_veg
+AHG-10,AHG,Brownie Sundae,dessert,7,vegetarian
+SGG-01,SGG,Turkey Club Sandwich,main,10,non_veg
+SGG-02,SGG,Egg & Cress Sandwich,main,8,vegetarian
+SGG-03,SGG,Protein Snack Box,side,6,vegetarian
+SGG-04,SGG,Bottled Iced Tea,drink,3,vegan
+SGG-05,SGG,Chocolate Chip Cookie,dessert,4,vegetarian
+SGG-06,SGG,Turkey Bacon Strips,side,4,non_veg
+SGG-07,SGG,Hummus & Veg Snack Pot,starter,5,vegan
+SGG-08,SGG,Chicken Caesar Wrap,main,10,non_veg
+SGG-09,SGG,Falafel Wrap,main,9,vegan
+GWE-01,GWE,Wok-Fried Noodles,main,12,non_veg
+GWE-02,GWE,Vegetarian Mapo Tofu,main,13,vegan
+GWE-03,GWE,Spring Rolls,starter,6,vegan
+GWE-04,GWE,Jasmine Tea,drink,3,vegan
+GWE-05,GWE,Five-Spice Pork Bites,starter,6,non_veg
+GWE-06,GWE,Hot & Sour Soup,starter,5,vegetarian
+GWE-07,GWE,Kung Pao Chicken,main,14,non_veg
+GWE-08,GWE,Garlic Green Beans,side,6,vegan
+GWE-09,GWE,Mango Pudding,dessert,5,vegetarian
+TDA-01,TDA,Butter Chicken,main,16,non_veg
+TDA-02,TDA,Chana Masala,main,11,vegan
+TDA-03,TDA,Garlic Naan,side,4,vegetarian
+TDA-04,TDA,Masala Chai,drink,3,vegetarian
+TDA-05,TDA,Kheer Rice Pudding,dessert,6,vegetarian
+TDA-06,TDA,Chicken Tikka Bites,starter,6,non_veg
+TDA-07,TDA,Aloo Tikki,starter,5,vegan
+TDA-08,TDA,Lamb Seekh Kebab,starter,8,non_veg
+TDA-09,TDA,Palak Paneer,main,14,vegetarian
+TDA-10,TDA,Dal Makhani,main,12,vegetarian
+SGS-01,SGS,Beef Pho,main,15,non_veg
+SGS-02,SGS,Grilled Pork Banh Mi,main,12,non_veg
+SGS-03,SGS,Vegetable Spring Rolls,starter,6,vegan
+SGS-04,SGS,Iced Vietnamese Coffee,drink,4,vegetarian
+SGS-05,SGS,Tofu & Herb Vermicelli Bowl,main,12,vegan
+SGS-06,SGS,Coconut Pandan Jelly,dessert,5,vegan
+SGS-07,SGS,Grilled Pork Skewer,starter,6,non_veg
+SGS-08,SGS,Crispy Tofu Fresh Rolls,starter,6,vegan
+SGS-09,SGS,Lemongrass Chicken Rice Plate,main,14,non_veg
+CAN-01,CAN,Slow-Braised Barbacoa Tacos,main,18,non_veg
+CAN-02,CAN,Black Bean & Avocado Bowl,main,14,vegan
+CAN-03,CAN,Roasted Corn Elote,side,6,vegetarian
+CAN-04,CAN,Hibiscus Agua Fresca,drink,5,vegan
+CAN-05,CAN,Churros with Chocolate,dessert,8,vegetarian
+CAN-06,CAN,Chorizo Queso Dip,starter,6,non_veg
+CAN-07,CAN,Chips & Pico de Gallo,starter,4,vegan
+CAN-08,CAN,Shrimp Ceviche Tostada,starter,9,non_veg
+CAN-09,CAN,Mushroom Quesadilla,main,13,vegetarian
+CAN-10,CAN,Tres Leches Cake,dessert,7,vegetarian
+FBP-01,FBP,Pepperoni Pizza,main,16,non_veg
+FBP-02,FBP,Margherita Pizza,main,13,vegetarian
+FBP-03,FBP,Vegan Garden Pizza,main,14,vegan
+FBP-04,FBP,Garlic Breadsticks,side,5,vegetarian
+FBP-05,FBP,Buffalo Wings,starter,7,non_veg
+FBP-06,FBP,Cola,drink,3,vegan
+FBP-07,FBP,Cinnamon Knots,dessert,6,vegetarian
+FBP-08,FBP,Fried Mozzarella Bites,starter,6,vegetarian
+FBP-09,FBP,Mushroom Truffle Pizza,main,16,vegetarian
+FBP-10,FBP,BBQ Chicken Pizza,main,17,non_veg
+VNT-01,VNT,Spaghetti & Meatballs,main,15,non_veg
+VNT-02,VNT,Penne Alfredo,main,13,vegetarian
+VNT-03,VNT,Vegan Marinara Penne,main,13,vegan
+VNT-04,VNT,Garden Salad,side,5,vegan
+VNT-05,VNT,Italian Sausage Skewer,starter,7,non_veg
+VNT-06,VNT,Warm Breadsticks,side,4,vegetarian
+VNT-07,VNT,Sparkling Lemonade,drink,3,vegan
+VNT-08,VNT,Tiramisu,dessert,7,vegetarian
+VNT-09,VNT,Arancini,starter,7,vegetarian
+VNT-10,VNT,Calamari Fritti,starter,9,non_veg
+VNT-11,VNT,Wild Mushroom Risotto,main,15,vegetarian
+VNT-12,VNT,Chicken Parmigiana,main,17,non_veg
+VNT-13,VNT,Panna Cotta,dessert,7,vegetarian
+HEG-01,HEG,Kimchi Pancake,starter,8,non_veg
+HEG-02,HEG,Crispy Tofu Bites,starter,7,vegan
+HEG-03,HEG,Bulgogi Beef Plate,main,22,non_veg
+HEG-04,HEG,Spicy Pork Galbi,main,21,non_veg
+HEG-05,HEG,Vegetable Bibimbap,main,16,vegan
+HEG-06,HEG,Gochujang Fried Chicken,main,19,non_veg
+HEG-07,HEG,Banchan Trio,side,6,vegan
+HEG-08,HEG,Sweet Rice Punch,drink,4,vegan
+HEG-09,HEG,Hotteok Sweet Pancakes,dessert,7,vegetarian
+HIT-01,HIT,Lentil Sambusa,starter,5,vegan
+HIT-02,HIT,Spiced Beef Sambusa,starter,6,non_veg
+HIT-03,HIT,Doro Wat Chicken Stew,main,17,non_veg
+HIT-04,HIT,Misir Wat Red Lentils,main,13,vegan
+HIT-05,HIT,Vegetable Combination Platter,main,15,vegan
+HIT-06,HIT,Tibs Sauteed Lamb,main,19,non_veg
+HIT-07,HIT,Extra Injera,side,3,vegan
+HIT-08,HIT,Spiced Coffee,drink,4,vegan
+HIT-09,HIT,Honey Wine Cake,dessert,6,vegetarian
+CDC-01,CDC,Hummus with Pine Nuts,starter,7,vegan
+CDC-02,CDC,Fattoush Salad,starter,7,vegan
+CDC-03,CDC,Lamb Kibbeh,starter,9,non_veg
+CDC-04,CDC,Chicken Shawarma Plate,main,18,non_veg
+CDC-05,CDC,Mixed Grill Platter,main,26,non_veg
+CDC-06,CDC,Falafel Plate,main,15,vegan
+CDC-07,CDC,Stuffed Grape Leaves,side,6,vegan
+CDC-08,CDC,Mint Lemonade,drink,5,vegan
+CDC-09,CDC,Rosewater Milk Pudding,dessert,7,vegetarian
+BST-01,BST,Spanakopita,starter,9,vegetarian
+BST-02,BST,Grilled Octopus,starter,16,non_veg
+BST-03,BST,Tzatziki & Pita,starter,7,vegetarian
+BST-04,BST,Lamb Kleftiko,main,28,non_veg
+BST-05,BST,Moussaka,main,24,non_veg
+BST-06,BST,Giant Beans in Tomato,main,18,vegan
+BST-07,BST,Greek Village Salad,side,8,vegetarian
+BST-08,BST,Mountain Herb Tea,drink,5,vegan
+BST-09,BST,Loukoumades Honey Puffs,dessert,9,vegetarian
+TPC-01,TPC,Classic Fish Ceviche,starter,12,non_veg
+TPC-02,TPC,Corn & Sweet Potato Causa,starter,9,vegan
+TPC-03,TPC,Lomo Saltado,main,21,non_veg
+TPC-04,TPC,Grilled Chicken Anticucho,main,17,non_veg
+TPC-05,TPC,Quinoa & Vegetable Stir-Fry,main,15,vegan
+TPC-06,TPC,Yuca Fries,side,6,vegan
+TPC-07,TPC,Purple Corn Chicha,drink,5,vegan
+TPC-08,TPC,Alfajores,dessert,6,vegetarian
+STH-01,STH,Dhokla,starter,5,vegetarian
+STH-02,STH,Khandvi Rolls,starter,5,vegetarian
+STH-03,STH,Full Gujarati Thali,main,16,vegetarian
+STH-04,STH,Mini Thali,main,11,vegetarian
+STH-05,STH,Undhiyu Vegetable Stew,main,13,vegan
+STH-06,STH,Thepla Flatbreads,side,4,vegetarian
+STH-07,STH,Chaas Spiced Buttermilk,drink,3,vegetarian
+STH-08,STH,Shrikhand,dessert,6,vegetarian
+LPK-01,LPK,French Onion Soup,starter,14,vegetarian
+LPK-02,LPK,Duck Liver Pate,starter,16,non_veg
+LPK-03,LPK,Beef Bourguignon,main,38,non_veg
+LPK-04,LPK,Pan-Seared Sea Bass,main,36,non_veg
+LPK-05,LPK,Wild Mushroom Vol-au-Vent,main,30,vegetarian
+LPK-06,LPK,Ratatouille Tian,main,28,vegan
+LPK-07,LPK,Gratin Potatoes,side,9,vegetarian
+LPK-08,LPK,Sparkling Elderflower,drink,7,vegan
+LPK-09,LPK,Creme Brulee,dessert,13,vegetarian
+LPK-10,LPK,Dark Chocolate Souffle,dessert,15,vegetarian
+EOS-01,EOS,Burnt Ends,starter,11,non_veg
+EOS-02,EOS,Fried Pickles,starter,6,vegetarian
+EOS-03,EOS,Smoked Brisket Plate,main,24,non_veg
+EOS-04,EOS,Pulled Pork Sandwich,main,15,non_veg
+EOS-05,EOS,Smoked Jackfruit Sandwich,main,14,vegan
+EOS-06,EOS,Half Rack of Ribs,main,26,non_veg
+EOS-07,EOS,Coleslaw,side,4,vegetarian
+EOS-08,EOS,Sweet Tea,drink,3,vegan
+EOS-09,EOS,Peach Cobbler,dessert,7,vegetarian
+LTS-01,LTS,Miso Soup,starter,4,vegan
+LTS-02,LTS,Seaweed Salad,starter,6,vegan
+LTS-03,LTS,Salmon Nigiri Set,main,19,non_veg
+LTS-04,LTS,Tuna & Avocado Roll,main,16,non_veg
+LTS-05,LTS,Vegetable Futomaki,main,13,vegan
+LTS-06,LTS,Chicken Katsu Curry,main,17,non_veg
+LTS-07,LTS,Pickled Ginger & Rice,side,3,vegan
+LTS-08,LTS,Genmaicha Tea,drink,4,vegan
+LTS-09,LTS,Black Sesame Ice Cream,dessert,6,vegetarian
+NOR-01,NOR,Pork Gyoza,starter,6,non_veg
+NOR-02,NOR,Chili Edamame,starter,5,vegan
+NOR-03,NOR,Tonkotsu Ramen,main,15,non_veg
+NOR-04,NOR,Spicy Miso Chicken Ramen,main,15,non_veg
+NOR-05,NOR,Shoyu Mushroom Ramen,main,13,vegan
+NOR-06,NOR,Soft-Boiled Marinated Egg,side,2,vegetarian
+NOR-07,NOR,Yuzu Soda,drink,4,vegan
+SBK-01,SBK,Crispy Chickpea Cup,starter,5,vegan
+SBK-02,SBK,Roasted Beet Hummus,starter,6,vegan
+SBK-03,SBK,Tempeh Power Bowl,main,13,vegan
+SBK-04,SBK,Mushroom Walnut Burger,main,13,vegan
+SBK-05,SBK,Thai Peanut Noodle Salad,main,12,vegan
+SBK-06,SBK,Sweet Potato Wedges,side,5,vegan
+SBK-07,SBK,Green Smoothie,drink,6,vegan
+SBK-08,SBK,Chocolate Avocado Mousse,dessert,6,vegan
+CLD-01,CLD,Burrata & Heirloom Tomato,starter,15,vegetarian
+CLD-02,CLD,Tuna Tartare,starter,17,non_veg
+CLD-03,CLD,Dry-Aged Ribeye,main,42,non_veg
+CLD-04,CLD,Herb-Crusted Lamb Rack,main,39,non_veg
+CLD-05,CLD,Charred Cauliflower & Romesco,main,27,vegan
+CLD-06,CLD,Truffle Fries,side,10,vegetarian
+CLD-07,CLD,Sunset Spritz (alcohol-free),drink,9,vegan
+CLD-08,CLD,Molten Chocolate Cake,dessert,14,vegetarian
+IHK-01,IHK,Saltfish Fritters,starter,7,non_veg
+IHK-02,IHK,Plantain Chips & Dip,starter,5,vegan
+IHK-03,IHK,Jerk Chicken Plate,main,17,non_veg
+IHK-04,IHK,Curry Goat,main,19,non_veg
+IHK-05,IHK,Ital Vegetable Rundown,main,14,vegan
+IHK-06,IHK,Rice & Peas,side,4,vegan
+IHK-07,IHK,Fried Sweet Plantain,side,5,vegan
+IHK-08,IHK,Sorrel Ginger Drink,drink,4,vegan
+IHK-09,IHK,Rum-Free Black Cake,dessert,7,vegetarian
+ANH-01,ANH,Red Lentil Soup,starter,5,vegan
+ANH-02,ANH,Cigar Borek,starter,6,vegetarian
+ANH-03,ANH,Adana Lamb Kebab,main,18,non_veg
+ANH-04,ANH,Chicken Doner Plate,main,15,non_veg
+ANH-05,ANH,Imam Bayildi Stuffed Eggplant,main,14,vegan
+ANH-06,ANH,Bulgur Pilaf,side,4,vegan
+ANH-07,ANH,Ayran Yogurt Drink,drink,3,vegetarian
+ANH-08,ANH,Pistachio Kunefe,dessert,8,vegetarian
+CLH-01,CLH,Medu Vada,starter,5,vegan
+CLH-02,CLH,Chicken 65,starter,7,non_veg
+CLH-03,CLH,Masala Dosa,main,11,vegan
+CLH-04,CLH,Ghee Roast Dosa,main,12,vegetarian
+CLH-05,CLH,Chettinad Chicken Curry,main,15,non_veg
+CLH-06,CLH,Idli Sambar,main,9,vegan
+CLH-07,CLH,Coconut Chutney Trio,side,3,vegan
+CLH-08,CLH,Filter Coffee,drink,3,vegetarian
+CLH-09,CLH,Payasam,dessert,5,vegetarian
+SSP-01,SSP,Cheese Twist,starter,4,vegetarian
+SSP-02,SSP,Ham & Gruyere Croissant,main,9,non_veg
+SSP-03,SSP,Spinach & Feta Quiche,main,9,vegetarian
+SSP-04,SSP,Butter Croissant,side,4,vegetarian
+SSP-05,SSP,Hot Chocolate,drink,5,vegetarian
+SSP-06,SSP,Lemon Meringue Tart,dessert,7,vegetarian
+SSP-07,SSP,Raspberry Macarons,dessert,8,vegetarian
+SSP-08,SSP,Vegan Carrot Cake,dessert,7,vegan

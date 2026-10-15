@@ -14,8 +14,8 @@
 ## Overview
 
 Maya is an API simulator for AI agents: a fictional world of everyday
-services — flights, hotels, car rental, food delivery and events — exposed as MCP
-tools and running locally. Five domains exist today:
+services — flights, hotels, car rental, food delivery, events and restaurant
+bookings — exposed as MCP tools and running locally. Six domains exist today:
 
 - **Flights** — search, book, retrieve and cancel flights on a fictional
   airline network, direct or with one stop. Seats deplete for real, fares
@@ -36,6 +36,10 @@ tools and running locally. Five domains exist today:
 - **Events** — comedy, concerts, lectures, theatre, family shows, films and
   workshops at venues across Aira. Popular shows sell out; some are 18+. See
   [`src/maya/simulations/events/README.md`](src/maya/simulations/events/README.md).
+- **Dining** — book tables at Aira's restaurants, the same ones delivery
+  sells from (minus the delivery-only kitchens). Peak slots at popular places
+  fill up days ahead; fine dining takes a deposit. See
+  [`src/maya/simulations/dining/README.md`](src/maya/simulations/dining/README.md).
 
 Each domain has its own bookings/orders that persist across restarts
 (SQLite) — so failures (sold-out flights or rooms, non-refundable fares,
@@ -52,10 +56,11 @@ flowchart LR
         hotels["Hotels"]
         cars["Cars"]
         events["Events"]
+        dining["Dining"]
     end
 
-    csv["World data (CSV)<br/>airports · vendors · hotels · fleet · shows"] -.->|"loaded on start"| maya
-    maya <-->|"real state"| db[("maya.db<br/>bookings · orders · rentals · tickets")]
+    csv["World data (CSV)<br/>airports · restaurants · hotels · fleet · shows"] -.->|"loaded on start"| maya
+    maya <-->|"real state"| db[("maya.db<br/>bookings · orders · rentals · tickets · tables")]
 ```
 
 ## Install
@@ -88,6 +93,7 @@ uv run maya serve --domain delivery   # delivery, same, :6292
 uv run maya serve --domain hotels     # hotels, same, :6292
 uv run maya serve --domain cars       # car rental, same, :6292
 uv run maya serve --domain events     # events, same, :6292
+uv run maya serve --domain dining     # dining, same, :6292
 uv run maya serve --domain world      # world controls (clock, reset), same, :6292
 uv run maya serve --domain all        # all at once, one port, one path each:
                                        #   http://localhost:6292/flights/mcp
@@ -95,6 +101,7 @@ uv run maya serve --domain all        # all at once, one port, one path each:
                                        #   http://localhost:6292/hotels/mcp
                                        #   http://localhost:6292/cars/mcp
                                        #   http://localhost:6292/events/mcp
+                                       #   http://localhost:6292/dining/mcp
                                        #   http://localhost:6292/world/mcp
 ```
 
@@ -144,8 +151,8 @@ Maya time carries on across restarts, and keeps running while the server is
 stopped.
 
 A reset — `world_reset`, or `uv run maya reset` from a terminal — empties
-every domain's bookings, orders, rentals and tickets and returns the clock
-to real time, all at once. It's the only way time goes backwards.
+every domain's bookings, orders, rentals, tickets and reservations and
+returns the clock to real time, all at once. It's the only way time goes backwards.
 
 ## Run with Docker
 
@@ -159,6 +166,7 @@ docker run -p 127.0.0.1:6292:6292 -v maya-data:/data ghcr.io/shvinn/maya
                                        #   http://localhost:6292/hotels/mcp
                                        #   http://localhost:6292/cars/mcp
                                        #   http://localhost:6292/events/mcp
+                                       #   http://localhost:6292/dining/mcp
                                        #   http://localhost:6292/world/mcp
 docker run -p 127.0.0.1:6292:6292 -v maya-data:/data ghcr.io/shvinn/maya serve --domain hotels
 docker compose up                      # same as the first, from a clone
@@ -175,10 +183,11 @@ docker compose up                      # same as the first, from a clone
 
 ## Connect an MCP client
 
-Pick one of three setups. Each gives you six servers: `flights`, `delivery`,
-`hotels`, `cars`, `events` and `world`. Give the agent you're testing the
-domain servers; keep `world` (the clock and reset controls) for yourself,
-so the agent can't skip past its own deadlines or wipe the world.
+Pick one of three setups. Each gives you seven servers: `flights`,
+`delivery`, `hotels`, `cars`, `events`, `dining` and `world`. Give the agent
+you're testing the domain servers; keep `world` (the clock and reset
+controls) for yourself, so the agent can't skip past its own deadlines or
+wipe the world.
 
 ### 1. Local, from a clone (stdio)
 
@@ -193,6 +202,7 @@ MCP clients don't start servers from inside it.
     "maya-hotels": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "hotels"] },
     "maya-cars": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "cars"] },
     "maya-events": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "events"] },
+    "maya-dining": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "dining"] },
     "maya-world": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "world"] }
   }
 }
@@ -217,6 +227,7 @@ Each client session starts a short-lived container; all of them share the
     "maya-hotels": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "hotels"] },
     "maya-cars": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "cars"] },
     "maya-events": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "events"] },
+    "maya-dining": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "dining"] },
     "maya-world": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "world"] }
   }
 }
@@ -235,6 +246,7 @@ claude mcp add --transport http maya-delivery http://localhost:6292/delivery/mcp
 claude mcp add --transport http maya-hotels http://localhost:6292/hotels/mcp
 claude mcp add --transport http maya-cars http://localhost:6292/cars/mcp
 claude mcp add --transport http maya-events http://localhost:6292/events/mcp
+claude mcp add --transport http maya-dining http://localhost:6292/dining/mcp
 claude mcp add --transport http maya-world http://localhost:6292/world/mcp
 ```
 
@@ -248,6 +260,7 @@ or a project's `.mcp.json`:
     "maya-hotels": { "type": "http", "url": "http://localhost:6292/hotels/mcp" },
     "maya-cars": { "type": "http", "url": "http://localhost:6292/cars/mcp" },
     "maya-events": { "type": "http", "url": "http://localhost:6292/events/mcp" },
+    "maya-dining": { "type": "http", "url": "http://localhost:6292/dining/mcp" },
     "maya-world": { "type": "http", "url": "http://localhost:6292/world/mcp" }
   }
 }

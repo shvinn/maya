@@ -1,20 +1,24 @@
-"""The delivery vendors of Aira.
+"""The delivery vendors of Aira: the restaurants that deliver.
 
-Reference data. The source of truth is data/vendors.csv; it is loaded into
-SQLite on init and read from there, so editing that file changes the world
-on next run.
+A vendor is a restaurant from world.places plus its delivery terms from
+data/delivery_vendors.csv (prep time, delivery fee). A restaurant with no
+row there doesn't deliver. The terms are loaded into SQLite on init and read
+from there, so editing that file changes the world on next run.
 
-Character is expressed through `style`, not free text, the same way an
-airline's rate_per_minute (not its blurb) drives fares: `home_kitchen`
-(cheap, slow prep), `chain` (mid-price, reliable, moderate prep),
-`ghost_kitchen` (cheap, near-instant prep -- fast enough that cancelling is
-effectively impossible once placed, see orders.py), `bistro` (pricier,
-slower, higher quality).
+Character is expressed through the restaurant's `style`, not free text, the
+same way an airline's rate_per_minute (not its blurb) drives fares:
+`home_kitchen` (cheap, slow prep), `chain` (mid-price, reliable, moderate
+prep), `ghost_kitchen` (cheap, near-instant prep -- fast enough that
+cancelling is effectively impossible once placed, see orders.py), `bistro`
+(pricier, slower, higher quality).
 """
 
 from __future__ import annotations
 
 from typing import NamedTuple
+
+from maya.world import places
+from maya.world.geography import maps
 
 from . import db
 
@@ -37,6 +41,7 @@ class Vendor(NamedTuple):
             "code": self.code,
             "name": self.name,
             "zone": self.zone,
+            "zone_name": maps.BY_CODE[self.zone].name,
             "cuisine": self.cuisine,
             "style": self.style,
             "prep_minutes": self.prep_minutes,
@@ -47,15 +52,15 @@ class Vendor(NamedTuple):
 
 def _load() -> tuple[Vendor, ...]:
     rows = db.connect().execute(
-        "SELECT code, name, zone, cuisine, style, prep_minutes, delivery_fee FROM vendors"
+        "SELECT code, prep_minutes, delivery_fee FROM delivery_vendors"
     ).fetchall()
-    return tuple(
-        Vendor(
-            r["code"], r["name"], r["zone"], r["cuisine"], r["style"],
-            r["prep_minutes"], r["delivery_fee"],
-        )
-        for r in rows
-    )
+    vendors = []
+    for r in rows:
+        restaurant = places.BY_CODE.get(r["code"])
+        if restaurant is None:
+            raise ValueError(f"Delivery terms for unknown restaurant {r['code']!r}.")
+        vendors.append(Vendor(*restaurant, r["prep_minutes"], r["delivery_fee"]))
+    return tuple(vendors)
 
 
 VENDORS: tuple[Vendor, ...] = _load()

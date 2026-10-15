@@ -1,8 +1,9 @@
 """Menu items across Aira's delivery vendors.
 
-Reference data, same loading pattern as vendors.py. Stock is unlimited in
-this domain -- there is no sold-out-mid-order mechanic the way flights has
-SoldOut; every item is always orderable.
+The menus are the restaurants' own (world.places); this is the deliverable
+part of them -- items from restaurants that are vendors. Stock is unlimited
+in this domain -- there is no sold-out-mid-order mechanic the way flights
+has SoldOut; every item is always orderable.
 
 get_menu() is for browsing one vendor once you already know who you're
 ordering from. search() is the cross-vendor tool: it matches on item name
@@ -17,7 +18,10 @@ from __future__ import annotations
 
 from typing import NamedTuple
 
-from . import db, vendors
+from maya.world import places
+from maya.world.geography import maps
+
+from . import vendors
 
 
 class MenuItem(NamedTuple):
@@ -41,12 +45,10 @@ class MenuItem(NamedTuple):
 
 
 def _load() -> tuple[MenuItem, ...]:
-    rows = db.connect().execute(
-        "SELECT item_id, vendor, name, category, price, diet FROM menu_items"
-    ).fetchall()
     return tuple(
-        MenuItem(r["item_id"], r["vendor"], r["name"], r["category"], r["price"], r["diet"])
-        for r in rows
+        MenuItem(*item)
+        for item in places.MENU_ITEMS
+        if item.restaurant in vendors.BY_CODE
     )
 
 
@@ -72,6 +74,7 @@ def _result(item: MenuItem) -> dict:
     out = item.to_dict()
     out["vendor_name"] = vendor.name if vendor else item.vendor
     out["zone"] = vendor.zone if vendor else None
+    out["zone_name"] = maps.BY_CODE[vendor.zone].name if vendor else None
     return out
 
 
