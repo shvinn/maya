@@ -211,3 +211,19 @@ def test_over_http_the_servers_own_environment_is_never_used(monkeypatch, reside
 def test_a_malformed_authorization_header_is_refused(header):
     with pytest.raises(residents.InvalidResidentKey):
         caller.current(Request({"authorization": header}))
+
+
+def test_a_tool_called_through_the_server_in_process_finds_its_resident(monkeypatch):
+    """A harness calling tools in-process (server.call_tool) gets a Context
+    with no HTTP request behind it; the resident comes from
+    MAYA_RESIDENT_KEY, as on stdio, instead of the call failing."""
+    import asyncio
+
+    from maya.mcp_tools import SERVERS
+
+    r = new_resident(monkeypatch, 5000)
+    result = asyncio.run(SERVERS["flights"].call_tool("flights_book_flight", {
+        "flight_number": "SA101", "date": DAY, "passenger_names": ["A"], "contact_email": "a@example.mb",
+    }))
+    assert not result.is_error
+    assert residents.balance(r["resident_id"]) < 5000
