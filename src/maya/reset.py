@@ -4,7 +4,9 @@ Every domain's bookings, orders, rentals, tickets and reservations -- and
 the seats, rooms, cars and tables they hold -- are emptied, flight status
 overrides are dropped, the world clock goes back to real time, and the
 world gets a new seed (see maya.world.seed), so its luck is new too.
-Reference data (the CSV files) is untouched; it isn't state.
+Reference data (the CSV files) is untouched; it isn't state. Residents
+and their keys are kept too -- they are who is in the world, not what
+happened in it -- but every wallet goes back to its opening balance.
 
 Bookings and the clock go together on purpose. Time only moves forward,
 except here: turning the clock back while bookings remain would leave
@@ -19,6 +21,7 @@ from maya.simulations.dining import reservations
 from maya.simulations.events import tickets
 from maya.simulations.flights import bookings as flight_bookings
 from maya.simulations.hotels import bookings as hotel_bookings
+from maya.simulations.residents import residents
 from maya.world import clock, seed as world_seed
 
 
@@ -36,4 +39,6 @@ def reset_world(seed: int | None = None) -> dict:
     }
     clock._reset()  # only ever here, with the bookings: see the module docstring
     world_seed._reset(seed)  # a new world's luck: see maya.world.seed
+    # After the clock, so the opening balances are stamped with the new "now".
+    cleared["resident_transactions"] = residents.reset()
     return cleared

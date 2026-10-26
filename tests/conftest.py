@@ -14,6 +14,12 @@ Prices, availability, statuses and cancellation windows all depend on
 with a frozen NOW (a Monday morning), which only moves when a test moves
 it. That makes the suite deterministic:
 it gives the same answers whatever day or time it runs.
+
+Booking, cancelling and reading bookings act as a resident, so every test
+also has one: a fresh resident with a wallet deep enough never to be the
+reason a booking fails, whose key is in MAYA_RESIDENT_KEY -- where a tool
+called directly (no HTTP headers) finds it. Tests about money or about
+who can see what make their own.
 """
 
 from __future__ import annotations
@@ -31,10 +37,14 @@ os.environ["MAYA_DB_PATH"] = str(Path(tempfile.mkdtemp(prefix="maya-tests-")) / 
 os.environ["MAYA_SEED"] = "20300304"
 
 from maya.reset import reset_world  # noqa: E402
+from maya.simulations.residents import caller, residents  # noqa: E402
 from maya.world import clock as world_clock  # noqa: E402
 
 #: Monday 4 March 2030, 09:00 -- the frozen "now" every test starts from.
 NOW = datetime(2030, 3, 4, 9, 0)
+
+#: The opening balance of every test's own resident: more than any test spends.
+TEST_OPENING_BALANCE = 10_000_000
 
 #: The real clock function, for tests of the clock itself (see test_clock.py).
 REAL_NOW = world_clock.now
@@ -67,6 +77,22 @@ def fresh_world() -> None:
     """Every test starts with no bookings, orders or rentals in any domain,
     and an unmodified world clock."""
     reset_world()
+
+
+@pytest.fixture(autouse=True)
+def resident(fresh_world: None, monkeypatch: pytest.MonkeyPatch) -> dict:
+    """This test's resident (with its key), the one tools act as."""
+    r = residents.create("Test", "Resident", age=30, opening_balance=TEST_OPENING_BALANCE)
+    act_as(monkeypatch, r)
+    return r
+
+
+def act_as(monkeypatch: pytest.MonkeyPatch, r: dict | None) -> None:
+    """Make tools act as resident ``r`` from here on -- or as no one."""
+    if r is None:
+        monkeypatch.delenv(caller.ENV_KEY, raising=False)
+    else:
+        monkeypatch.setenv(caller.ENV_KEY, r["key"])
 
 
 def error_of(result) -> dict | None:
