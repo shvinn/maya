@@ -160,7 +160,9 @@ def _residents(args: argparse.Namespace) -> None:
         return f"{r['resident_id']}  {r['first_name']} {r['last_name']} ({r['gender']}, {r['age']})  {r['email']}"
 
     def balance(resident_id: str) -> str:
-        return f"{residents.balance(resident_id)} {residents.CURRENCY}"
+        on_hold = residents.held(resident_id)
+        total = f"{residents.balance(resident_id)} {residents.CURRENCY}"
+        return total + (f" ({on_hold} held, {residents.available(resident_id)} available)" if on_hold else "")
 
     def show_key(key: str, url: str | None = None) -> None:
         print("\nResident key (shown once -- save it now):")
@@ -216,6 +218,7 @@ def _residents(args: argparse.Namespace) -> None:
                 print(
                     f"{t['transaction_id']}  {t['maya_time']}  {t['kind']:<15} {t['amount']:>+8}"
                     + (f"  {t['domain']} {t['reference']}" if t["reference"] else "")
+                    + (f"  until {t['expires_at']}" if t.get("expires_at") else "")
                 )
             print(f"Balance: {balance(args.resident_id)}")
     except residents.ResidentError as e:

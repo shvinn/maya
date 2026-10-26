@@ -30,6 +30,8 @@ def test_the_profile_has_everything_and_the_current_balance(monkeypatch):
         "email": r["email"],
         "created_at": r["created_at"],
         "balance": {"amount": 5250, "currency": "bucks"},
+        "held": {"amount": 0, "currency": "bucks"},
+        "available": {"amount": 5250, "currency": "bucks"},
     }
     assert "key" not in profile and "key_hash" not in profile
     assert profile["email"].startswith("seren.halloway") and profile["email"].endswith("@example.com")

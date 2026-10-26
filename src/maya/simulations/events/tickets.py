@@ -15,7 +15,11 @@ top.
 Prices are fixed face values, the way comedy, theatre and lecture tickets
 really are: ``base_price x section price_factor``, plus a per-ticket service
 fee of ``SERVICE_FEE_PERCENT`` (rounded up; free events carry none). On
-cancellation the face value is refunded and the fee is not.
+cancellation the face value is refunded and the fee is not. The total is
+paid from the booking resident's wallet in the same transaction that takes
+the tickets (``insufficient_funds`` otherwise), and a refund goes back to
+them. A resident only sees and cancels their own bookings; anyone else's
+is not found.
 
 The booking rules: no more than the series' ``max_tickets_per_order``;
 age-restricted series need ``youngest_attendee_age`` and refuse anyone
@@ -31,6 +35,7 @@ import random
 from datetime import date, datetime, timedelta
 
 from maya import storage
+from maya.simulations.residents import residents
 from maya.world import clock
 from maya.world.geography import maps
 
@@ -264,11 +269,13 @@ def _book(
     quantity: int,
     attendee_name: str,
     contact_email: str,
+    resident_id: str,
     youngest_attendee_age: int | None = None,
 ) -> dict:
-    """Buy tickets in one section of one performance. Raises EventNotFound,
-    NotOnThatDate, SectionNotFound, InvalidDate, SalesClosed,
-    InvalidQuantity, TicketLimitExceeded, AgeRestricted or SoldOut."""
+    """Buy tickets in one section of one performance, paid by
+    ``resident_id``. Raises EventNotFound, NotOnThatDate, SectionNotFound,
+    InvalidDate, SalesClosed, InvalidQuantity, TicketLimitExceeded,
+    AgeRestricted, SoldOut or residents.InsufficientFunds."""
     perf = find_performance(event_id, day_text)
     series = perf.series
     section = catalog.get_section(section_id)
@@ -322,6 +329,7 @@ def _book(
         "quantity": quantity,
         "attendee_name": attendee_name,
         "contact_email": contact_email,
+        "resident_id": resident_id,
         "face_price_per_ticket": {"amount": face, "currency": CURRENCY},
         "service_fee_per_ticket": {"amount": fee, "currency": CURRENCY},
         "total_price": {"amount": (face + fee) * quantity, "currency": CURRENCY},
@@ -329,8 +337,9 @@ def _book(
         "refund_policy": series.policy_text(),
         "booked_at": now.strftime("%Y-%m-%d %H:%M"),
     }
+    paid = residents.charge(db.connect(), resident_id, (face + fee) * quantity, reference, "events")
     _save_booking(booking)
-    return _with_live_status(booking)
+    return {**_with_live_status(booking), "payment": residents.payment(paid)}
 
 def book(
     event_id: str,
@@ -339,22 +348,35 @@ def book(
     quantity: int,
     attendee_name: str,
     contact_email: str,
+    resident_id: str,
     youngest_attendee_age: int | None = None,
 ) -> dict:
-    """Book atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction), so concurrent bookings
-    can't both take the last of anything."""
+    """Book atomically: every check and write below -- the payment included
+    -- happens in one transaction (see maya.storage.transaction), so
+    concurrent bookings can't both take the last of anything, or both spend
+    the same money."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _book(event_id, day_text, section_id, quantity, attendee_name, contact_email, youngest_attendee_age)
+        return _book(
+            event_id, day_text, section_id, quantity, attendee_name, contact_email, resident_id, youngest_attendee_age
+        )
 
 
-def get(reference: str) -> dict | None:
+def _owned(reference: str, resident_id: str) -> dict | None:
+    """The booking, if ``resident_id`` owns it. Someone else's booking is
+    None, exactly like one that doesn't exist, so a reference never
+    confirms that another resident's booking is there."""
     booking = _get_booking((reference or "").strip().upper())
+    return booking if booking and booking.get("resident_id") == resident_id else None
+
+
+def get(reference: str, resident_id: str) -> dict | None:
+    booking = _owned(reference, resident_id)
     return _with_live_status(booking) if booking else None
 
 
-def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
-    out = [_with_live_status(b) for b in _all_bookings()]
+def list_all(resident_id: str, email: str | None = None, status: str | None = None) -> list[dict]:
+    out = [_with_live_status(b) for b in _all_bookings() if b.get("resident_id") == resident_id]
     if email:
         needle = email.strip().lower()
         out = [b for b in out if b["contact_email"].lower() == needle]
@@ -364,10 +386,10 @@ def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
     return sorted(out, key=lambda b: (b["start"], b["booking_reference"]))
 
 
-def _cancel(reference: str) -> dict:
+def _cancel(reference: str, resident_id: str) -> dict:
     """Cancel a booking: face value back if inside the series' refund window,
     the service fee never; non-refundable series can't be cancelled at all."""
-    booking = _get_booking((reference or "").strip().upper())
+    booking = _owned(reference, resident_id)
     if booking is None:
         raise NotFound(f"No booking with reference {reference!r}.")
     if booking["cancelled"]:
@@ -387,24 +409,31 @@ def _cancel(reference: str) -> dict:
     _adjust_tickets_sold(booking["event_id"], date.fromisoformat(booking["date"]), booking["section_id"], -booking["quantity"])
     refund = {"amount": booking["face_price_per_ticket"]["amount"] * booking["quantity"], "currency": CURRENCY}
     booking["refund"] = refund
+    # To the resident who paid -- the booking's owner -- whoever is asking.
+    refunded = residents.refund(
+        db.connect(), booking["resident_id"], refund["amount"], booking["booking_reference"], "events"
+    )
     _save_booking(booking)
     return {
         "booking_reference": booking["booking_reference"],
         "reference": booking["booking_reference"],
         "status": "CANCELLED",
         "refund": refund,
+        "payment": residents.payment(refunded),
         "fee_not_refunded": {
             "amount": booking["service_fee_per_ticket"]["amount"] * booking["quantity"], "currency": CURRENCY,
         },
         "reason": "Cancelled inside the refund window: face value refunded, service fee kept.",
     }
 
-def cancel(reference: str) -> dict:
-    """Cancel atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction), so two requests can't
-    cancel the same booking twice or release its inventory twice."""
+def cancel(reference: str, resident_id: str) -> dict:
+    """Cancel atomically: every check and write below -- the refund
+    included -- happens in one transaction (see maya.storage.transaction),
+    so two requests can't cancel the same booking twice, or release its
+    tickets or refund it twice."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _cancel(reference)
+        return _cancel(reference, resident_id)
 
 
 def reset() -> int:

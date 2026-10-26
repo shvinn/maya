@@ -25,8 +25,10 @@ add_time_tool(mcp)
 @mcp.tool()
 def residents_get_profile(ctx: Context | None = None) -> dict:
     """Your resident profile and wallet: resident id, first and last name,
-    gender, age, email, when you became a resident, and your current
-    balance.
+    gender, age, email, when you became a resident, and your money --
+    ``balance`` (all of it), ``held`` (set aside, e.g. a fine-dining
+    deposit, until the booking ends) and ``available`` (what you can spend
+    now: balance less held).
 
     Read-only -- a profile can't be changed from here. Fails with
     resident_required if your MCP client sends no resident key.
@@ -35,19 +37,17 @@ def residents_get_profile(ctx: Context | None = None) -> dict:
         resident = caller.current(ctx)
     except residents.ResidentError as e:
         return _error(e.code, str(e), e.hint)
-    return {
-        **resident,
-        "balance": {"amount": residents.balance(resident["resident_id"]), "currency": residents.CURRENCY},
-    }
+    return {**resident, **residents.wallet(resident["resident_id"])}
 
 
 @mcp.tool()
 def residents_list_transactions(ctx: Context | None = None) -> list[dict]:
     """Every movement of money in your wallet, oldest first: the opening
-    balance, top-ups, charges for bookings and refunds for cancellations.
-    Charges are negative. Each charge or refund names the booking
-    (``reference``) and the domain it was for, so it matches what that
-    domain's get-booking tool shows. Your balance is their sum.
+    balance, top-ups, charges for bookings and refunds for cancellations --
+    and holds (with when they lapse, ``expires_at``) and their releases.
+    Charges and holds are negative. Each names the booking (``reference``)
+    and the domain it was for, so it matches what that domain's get tool
+    shows. Your balance is the sum of everything but holds and releases.
     """
     try:
         resident = caller.current(ctx)

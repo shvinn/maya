@@ -93,7 +93,7 @@ somewhere else.
 > ```
 >
 > The key is printed once. See [Residents and money](#residents-and-money).
-> Flights enforce this today; the other domains follow.
+> This holds in every domain.
 
 ## Usage
 
@@ -143,23 +143,38 @@ the last seat can't both get it.
 
 | | Guest (no key) | Resident (with its key) |
 |---|---|---|
-| Search, browse, check availability and flight status | ✅ | ✅ |
-| Book, cancel | ❌ `resident_required` | ✅ paid from, and refunded to, their wallet |
-| See bookings | ❌ `resident_required` | ✅ their own only |
+| Search, browse, menus, availability, flight status | ✅ | ✅ |
+| Book, order, rent, reserve, cancel | ❌ `resident_required` | ✅ paid from, and refunded to, their wallet |
+| See bookings, orders, rentals, reservations | ❌ `resident_required` | ✅ their own only |
 | Profile, balance, transactions (`residents` server) | ❌ `resident_required` | ✅ their own, read-only |
 
-**Guests can only read.** Anything that writes — booking, cancelling —
-or that is about a person needs a resident, and the resident's key. Today
-this holds for flights; hotels, cars, delivery, dining and events don't use
-residents yet and still book without one.
+**Guests can only read.** Anything that writes — booking, ordering,
+cancelling — or that is about a person needs a resident, and the
+resident's key, in every domain.
 
-Booking a flight acts as a **resident**: a person in Maya with a profile
-(name, gender, age, email) and a wallet. The fare is paid from their wallet
-in the same step that takes the seats, so with too little money nothing is
-booked (`insufficient_funds`); a refund goes back to the wallet that paid.
+Booking acts as a **resident**: a person in Maya with a profile (name,
+gender, age, email) and a wallet. The price is paid from their wallet in
+the same step that takes the seat, room, car, ticket or order, so with too
+little money nothing is booked (`insufficient_funds`). A cancellation
+refunds on each domain's own terms, always to the wallet that paid:
+
+| Domain | Paid on booking | Back on cancelling |
+|---|---|---|
+| Flights | The fare | All of it, inside the fare's rules |
+| Hotels | The stay | All of it, before the hotel's cutoff |
+| Cars | The rental | All of it, before pickup |
+| Delivery | Items and delivery fee | All of it, while it's still being prepared |
+| Events | Tickets and service fee | The face value; the fee is kept |
+| Dining | Nothing — fine dining *holds* a deposit | The hold is released in time; late, the deposit is charged |
+
+A **hold** is money that stays in the wallet but can't be spent until the
+booking is over: a fine-dining table holds `deposit_per_guest × party` until
+the end of the sitting, then the hold lapses by itself and nothing is
+spent. So a wallet has a `balance` (all of it), `held`, and `available`
+(what can be spent), and every booking is checked against `available`.
+
 A resident only ever sees and cancels their own bookings — anyone else's
-reference comes back `not_found`. Searching and flight status need no
-resident. (Flights first; the other domains don't charge yet.)
+reference comes back `not_found`.
 
 **1. Create a resident.** You do this from a terminal, never an agent —
 there is no tool for it, and the server doesn't need to be running:

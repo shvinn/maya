@@ -3,7 +3,11 @@
 A rental and the cars out per day survive a restart; ``reset()`` empties
 them, as part of a world reset (see maya.reset). Booking is a single step, same as
 every other domain: search, book, confirmed -- no hold, no deposit, no
-payment call.
+separate payment call: the rental's total is paid from the booking
+resident's wallet in the same transaction that takes the car
+(``insufficient_funds`` otherwise), and cancelling refunds it to them. A
+resident only sees and cancels their own rentals; anyone else's is not
+found.
 
 A rental is charged per started 24-hour period from pickup, the way real
 rental desks bill: 10:00 to 10:00 the next day is 1 day, 10:00 to 11:00 the
@@ -37,6 +41,7 @@ import random
 from datetime import date, datetime, time, timedelta
 
 from maya import storage
+from maya.simulations.residents import residents
 from maya.world import clock
 
 from . import db, fleet
@@ -238,9 +243,10 @@ def _book(
     driver_name: str,
     driver_age: int,
     contact_email: str,
+    resident_id: str,
 ) -> dict:
-    """Reserve one car. Raises CarNotFound, InvalidDates, DriverTooYoung or
-    SoldOut."""
+    """Reserve one car, paid by ``resident_id``. Raises CarNotFound,
+    InvalidDates, DriverTooYoung, SoldOut or residents.InsufficientFunds."""
     car = fleet.get(car_id)
     if car is None:
         raise CarNotFound(f"No car with id {car_id!r}.")
@@ -271,13 +277,15 @@ def _book(
         "driver_name": driver_name,
         "driver_age": driver_age,
         "contact_email": contact_email,
+        "resident_id": resident_id,
         "daily_prices": q["daily_prices"],
         "total_price": {"amount": q["total"], "currency": CURRENCY},
         "cancellation_policy": "Free cancellation any time before pickup; not possible after.",
         "booked_at": clock.now().strftime("%Y-%m-%d %H:%M"),
     }
+    paid = residents.charge(db.connect(), resident_id, q["total"], reference, "cars")
     _save_rental(rental)
-    return _with_live_status(rental)
+    return {**_with_live_status(rental), "payment": residents.payment(paid)}
 
 def book(
     car_id: str,
@@ -286,21 +294,32 @@ def book(
     driver_name: str,
     driver_age: int,
     contact_email: str,
+    resident_id: str,
 ) -> dict:
-    """Book atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction), so concurrent bookings
-    can't both take the last of anything."""
+    """Book atomically: every check and write below -- the payment included
+    -- happens in one transaction (see maya.storage.transaction), so
+    concurrent bookings can't both take the last of anything, or both spend
+    the same money."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _book(car_id, pickup_at, dropoff_at, driver_name, driver_age, contact_email)
+        return _book(car_id, pickup_at, dropoff_at, driver_name, driver_age, contact_email, resident_id)
 
 
-def get(reference: str) -> dict | None:
+def _owned(reference: str, resident_id: str) -> dict | None:
+    """The rental, if ``resident_id`` owns it. Someone else's rental is
+    None, exactly like one that doesn't exist, so a reference never
+    confirms that another resident's rental is there."""
     rental = _get_rental((reference or "").strip().upper())
+    return rental if rental and rental.get("resident_id") == resident_id else None
+
+
+def get(reference: str, resident_id: str) -> dict | None:
+    rental = _owned(reference, resident_id)
     return _with_live_status(rental) if rental else None
 
 
-def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
-    out = [_with_live_status(r) for r in _all_rentals()]
+def list_all(resident_id: str, email: str | None = None, status: str | None = None) -> list[dict]:
+    out = [_with_live_status(r) for r in _all_rentals() if r.get("resident_id") == resident_id]
     if email:
         needle = email.strip().lower()
         out = [r for r in out if r["contact_email"].lower() == needle]
@@ -310,9 +329,9 @@ def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
     return sorted(out, key=lambda r: (r["pickup_at"], r["rental_reference"]))
 
 
-def _cancel(reference: str) -> dict:
+def _cancel(reference: str, resident_id: str) -> dict:
     """Cancel a rental: free any time before pickup, impossible after."""
-    rental = _get_rental((reference or "").strip().upper())
+    rental = _owned(reference, resident_id)
     if rental is None:
         raise NotFound(f"No rental with reference {reference!r}.")
     current_status = _status(rental)
@@ -331,21 +350,28 @@ def _cancel(reference: str) -> dict:
     _adjust_cars_out(rental["car_id"], days, -1)
     refund = {"amount": rental["total_price"]["amount"], "currency": CURRENCY}
     rental["refund"] = refund
+    # To the resident who paid -- the rental's owner -- whoever is asking.
+    refunded = residents.refund(
+        db.connect(), rental["resident_id"], refund["amount"], rental["rental_reference"], "cars"
+    )
     _save_rental(rental)
     return {
         "rental_reference": rental["rental_reference"],
         "reference": rental["rental_reference"],
         "status": "CANCELLED",
         "refund": refund,
+        "payment": residents.payment(refunded),
         "reason": "Cancelled before pickup: full refund.",
     }
 
-def cancel(reference: str) -> dict:
-    """Cancel atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction), so two requests can't
-    cancel the same booking twice or release its inventory twice."""
+def cancel(reference: str, resident_id: str) -> dict:
+    """Cancel atomically: every check and write below -- the refund
+    included -- happens in one transaction (see maya.storage.transaction),
+    so two requests can't cancel the same rental twice, or release its car
+    or refund it twice."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _cancel(reference)
+        return _cancel(reference, resident_id)
 
 
 def reset() -> int:

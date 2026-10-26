@@ -5,7 +5,11 @@ rest of the domain is reference data re-derived from CSV. ``reset()`` is the
 explicit way to empty it back out, as part of a world reset (see maya.reset).
 
 Booking is a single step, same as flights and delivery: search, book,
-confirmed. No hold, no rate plan to choose, no payment call.
+confirmed. No hold, no rate plan to choose, no separate payment call: the
+stay's total is paid from the booking resident's wallet in the same
+transaction that takes the rooms (``insufficient_funds`` otherwise), and a
+cancellation refunds it to them. A resident only sees and cancels their own
+bookings; anyone else's is not found.
 
 Inventory is per room type *per night*, because that is what a hotel
 actually sells: a 3-night stay needs a free room on each of its 3 nights,
@@ -41,6 +45,7 @@ import random
 from datetime import date, datetime, time, timedelta
 
 from maya import storage
+from maya.simulations.residents import residents
 from maya.world import clock
 from maya.world.geography import maps
 
@@ -262,9 +267,11 @@ def _book(
     guests: int,
     guest_name: str,
     contact_email: str,
+    resident_id: str,
 ) -> dict:
-    """Confirm a stay in one room. Raises RoomTypeNotFound, InvalidDates,
-    InvalidGuests, TooManyGuests or SoldOut."""
+    """Confirm a stay in one room, paid by ``resident_id``. Raises
+    RoomTypeNotFound, InvalidDates, InvalidGuests, TooManyGuests, SoldOut or
+    residents.InsufficientFunds."""
     room = hotels.get_room_type(room_type_id)
     if room is None:
         raise RoomTypeNotFound(f"No room type with id {room_type_id!r}.")
@@ -301,14 +308,16 @@ def _book(
         "guests": guests,
         "guest_name": guest_name,
         "contact_email": contact_email,
+        "resident_id": resident_id,
         "nightly_prices": q["nightly_prices"],
         "total_price": {"amount": q["total"], "currency": CURRENCY},
         "refundable": hotel.refundable,
         "cancellation_policy": hotel.policy_text(),
         "booked_at": clock.now().strftime("%Y-%m-%d %H:%M"),
     }
+    paid = residents.charge(db.connect(), resident_id, q["total"], reference, "hotels")
     _save_booking(booking)
-    return _with_live_status(booking)
+    return {**_with_live_status(booking), "payment": residents.payment(paid)}
 
 def book(
     room_type_id: str,
@@ -317,21 +326,32 @@ def book(
     guests: int,
     guest_name: str,
     contact_email: str,
+    resident_id: str,
 ) -> dict:
-    """Book atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction), so concurrent bookings
-    can't both take the last of anything."""
+    """Book atomically: every check and write below -- the payment included
+    -- happens in one transaction (see maya.storage.transaction), so
+    concurrent bookings can't both take the last of anything, or both spend
+    the same money."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _book(room_type_id, check_in, check_out, guests, guest_name, contact_email)
+        return _book(room_type_id, check_in, check_out, guests, guest_name, contact_email, resident_id)
 
 
-def get(reference: str) -> dict | None:
+def _owned(reference: str, resident_id: str) -> dict | None:
+    """The booking, if ``resident_id`` owns it. Someone else's booking is
+    None, exactly like one that doesn't exist, so a reference never
+    confirms that another resident's booking is there."""
     booking = _get_booking((reference or "").strip().upper())
+    return booking if booking and booking.get("resident_id") == resident_id else None
+
+
+def get(reference: str, resident_id: str) -> dict | None:
+    booking = _owned(reference, resident_id)
     return _with_live_status(booking) if booking else None
 
 
-def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
-    out = [_with_live_status(b) for b in _all_bookings()]
+def list_all(resident_id: str, email: str | None = None, status: str | None = None) -> list[dict]:
+    out = [_with_live_status(b) for b in _all_bookings() if b.get("resident_id") == resident_id]
     if email:
         needle = email.strip().lower()
         out = [b for b in out if b["contact_email"].lower() == needle]
@@ -341,10 +361,10 @@ def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
     return sorted(out, key=lambda b: (b["check_in"], b["booking_reference"]))
 
 
-def _cancel(reference: str) -> dict:
+def _cancel(reference: str, resident_id: str) -> dict:
     """Cancel a booking: full refund outside the hotel's cutoff, impossible
     inside it, and never possible at a non-refundable hotel."""
-    booking = _get_booking((reference or "").strip().upper())
+    booking = _owned(reference, resident_id)
     if booking is None:
         raise NotFound(f"No booking with reference {reference!r}.")
     if booking["cancelled"]:
@@ -370,23 +390,30 @@ def _cancel(reference: str) -> dict:
     _adjust_rooms_sold(booking["room_type_id"], nights, -1)
     refund = {"amount": booking["total_price"]["amount"], "currency": CURRENCY}
     booking["refund"] = refund
+    # To the resident who paid -- the booking's owner -- whoever is asking.
+    refunded = residents.refund(
+        db.connect(), booking["resident_id"], refund["amount"], booking["booking_reference"], "hotels"
+    )
     _save_booking(booking)
     return {
         "booking_reference": booking["booking_reference"],
         "reference": booking["booking_reference"],
         "status": "CANCELLED",
         "refund": refund,
+        "payment": residents.payment(refunded),
         "reason": (
             f"Cancelled more than {hotel.cancel_cutoff_hours} hours before check-in: full refund."
         ),
     }
 
-def cancel(reference: str) -> dict:
-    """Cancel atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction), so two requests can't
-    cancel the same booking twice or release its inventory twice."""
+def cancel(reference: str, resident_id: str) -> dict:
+    """Cancel atomically: every check and write below -- the refund
+    included -- happens in one transaction (see maya.storage.transaction),
+    so two requests can't cancel the same booking twice, or release its
+    inventory or refund it twice."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _cancel(reference)
+        return _cancel(reference, resident_id)
 
 
 def reset() -> int:

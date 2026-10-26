@@ -7,8 +7,9 @@ lives here -- same pattern as simulations/hotels/mcp_tools.py.
 
 from __future__ import annotations
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 
+from maya.simulations.residents import caller, residents
 from maya.tool_errors import tool_error as _error
 from maya.world.mcp_tools import add_time_tool
 
@@ -65,28 +66,38 @@ def cars_book_car(
     driver_name: str,
     driver_age: int,
     contact_email: str,
+    ctx: Context | None = None,
 ) -> dict:
-    """Reserve one car. Confirms immediately -- there is no hold, deposit or
-    payment step.
+    """Reserve one car. Confirms immediately and pays the ``total_price``
+    from your resident's wallet in the same step (``payment`` shows the
+    charge and what's left); fails with insufficient_funds, booking nothing,
+    if you can't cover it. There is no hold or deposit.
 
     The price is the live price at the moment of booking, locked in from
     then on. The driver must be at least 21 (driver_too_young otherwise).
     Fails with sold_out if any day of the rental has no car of that model.
     """
     try:
-        return rentals.book(car_id, pickup_at, dropoff_at, driver_name, driver_age, contact_email)
-    except rentals.RentalError as e:
+        resident = caller.current(ctx)
+        return rentals.book(
+            car_id, pickup_at, dropoff_at, driver_name, driver_age, contact_email, resident["resident_id"]
+        )
+    except (rentals.RentalError, residents.ResidentError) as e:
         return _error(e.code, str(e), e.hint)
 
 
 @mcp.tool()
-def cars_get_rental(reference: str) -> dict:
-    """Retrieve a rental by its reference.
+def cars_get_rental(reference: str, ctx: Context | None = None) -> dict:
+    """Retrieve one of your rentals by its reference.
 
     ``status`` is computed live from the clock, not stored: RESERVED until
     pickup, PICKED_UP until drop-off, then RETURNED.
     """
-    rental = rentals.get(reference)
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
+    rental = rentals.get(reference, resident["resident_id"])
     if rental is None:
         return _error(
             "not_found",
@@ -97,22 +108,30 @@ def cars_get_rental(reference: str) -> dict:
 
 
 @mcp.tool()
-def cars_list_rentals(email: str | None = None, status: str | None = None) -> list[dict]:
-    """List rentals, optionally filtered by contact email or status.
+def cars_list_rentals(
+    email: str | None = None, status: str | None = None, ctx: Context | None = None
+) -> list[dict]:
+    """List your rentals, optionally filtered by contact email or status.
 
     ``status`` is one of "RESERVED", "PICKED_UP", "RETURNED", "CANCELLED" --
     computed live, not stored.
     """
-    return rentals.list_all(email, status)
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
+    return rentals.list_all(resident["resident_id"], email, status)
 
 
 @mcp.tool()
-def cars_cancel_rental(reference: str) -> dict:
-    """Cancel a rental for a full refund. Free any time before pickup.
+def cars_cancel_rental(reference: str, ctx: Context | None = None) -> dict:
+    """Cancel one of your rentals for a full refund, straight back to your
+    resident's wallet. Free any time before pickup.
 
     Once the pickup time has passed, this fails with too_late_to_cancel.
     """
     try:
-        return rentals.cancel(reference)
-    except rentals.RentalError as e:
+        resident = caller.current(ctx)
+        return rentals.cancel(reference, resident["resident_id"])
+    except (rentals.RentalError, residents.ResidentError) as e:
         return _error(e.code, str(e), e.hint)

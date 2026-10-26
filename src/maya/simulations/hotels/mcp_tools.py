@@ -7,8 +7,9 @@ lives here -- same pattern as simulations/delivery/mcp_tools.py.
 
 from __future__ import annotations
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 
+from maya.simulations.residents import caller, residents
 from maya.tool_errors import tool_error as _error
 from maya.world.mcp_tools import add_time_tool
 
@@ -88,9 +89,12 @@ def hotels_book_room(
     guests: int,
     guest_name: str,
     contact_email: str,
+    ctx: Context | None = None,
 ) -> dict:
-    """Book one room for a stay. Confirms immediately -- there is no
-    separate hold-then-pay step.
+    """Book one room for a stay. Confirms immediately and pays the
+    ``total_price`` from your resident's wallet in the same step
+    (``payment`` shows the charge and what's left); fails with
+    insufficient_funds, booking nothing, if you can't cover it.
 
     The price is the live price at the moment of booking, and is locked in
     from then on. Fails with sold_out if any single night has no room left,
@@ -98,20 +102,27 @@ def hotels_book_room(
     for a bigger party, book several rooms.
     """
     try:
-        return bookings.book(room_type_id, check_in, check_out, guests, guest_name, contact_email)
-    except bookings.BookingError as e:
+        resident = caller.current(ctx)
+        return bookings.book(
+            room_type_id, check_in, check_out, guests, guest_name, contact_email, resident["resident_id"]
+        )
+    except (bookings.BookingError, residents.ResidentError) as e:
         return _error(e.code, str(e), e.hint)
 
 
 @mcp.tool()
-def hotels_get_booking(reference: str) -> dict:
-    """Retrieve a booking by its reference.
+def hotels_get_booking(reference: str, ctx: Context | None = None) -> dict:
+    """Retrieve one of your bookings by its reference.
 
     ``status`` is computed live from the clock, not stored: CONFIRMED until
     check-in (15:00 on the check-in date), CHECKED_IN until check-out
     (11:00 on the check-out date), then CHECKED_OUT.
     """
-    booking = bookings.get(reference)
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
+    booking = bookings.get(reference, resident["resident_id"])
     if booking is None:
         return _error(
             "not_found",
@@ -122,24 +133,32 @@ def hotels_get_booking(reference: str) -> dict:
 
 
 @mcp.tool()
-def hotels_list_bookings(email: str | None = None, status: str | None = None) -> list[dict]:
-    """List bookings, optionally filtered by contact email or status.
+def hotels_list_bookings(
+    email: str | None = None, status: str | None = None, ctx: Context | None = None
+) -> list[dict]:
+    """List your bookings, optionally filtered by contact email or status.
 
     ``status`` is one of "CONFIRMED", "CHECKED_IN", "CHECKED_OUT",
     "CANCELLED" -- computed live, not stored.
     """
-    return bookings.list_all(email, status)
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
+    return bookings.list_all(resident["resident_id"], email, status)
 
 
 @mcp.tool()
-def hotels_cancel_booking(reference: str) -> dict:
-    """Cancel a booking for a full refund.
+def hotels_cancel_booking(reference: str, ctx: Context | None = None) -> dict:
+    """Cancel one of your bookings for a full refund, straight back to your
+    resident's wallet.
 
     Each hotel has its own cutoff (see cancellation_policy): inside it this
     fails with too_late_to_cancel, and non-refundable hotels always fail with
     not_refundable. There are no partial refunds.
     """
     try:
-        return bookings.cancel(reference)
-    except bookings.BookingError as e:
+        resident = caller.current(ctx)
+        return bookings.cancel(reference, resident["resident_id"])
+    except (bookings.BookingError, residents.ResidentError) as e:
         return _error(e.code, str(e), e.hint)

@@ -7,8 +7,9 @@ lives here -- same pattern as simulations/flights/mcp_tools.py.
 
 from __future__ import annotations
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 
+from maya.simulations.residents import caller, residents
 from maya.tool_errors import tool_error as _error
 from maya.world.mcp_tools import add_time_tool
 
@@ -86,9 +87,12 @@ def delivery_place_order(
     delivery_zone: str,
     contact_phone: str,
     deliver_at: str | None = None,
+    ctx: Context | None = None,
 ) -> dict:
     """Place an order at one vendor, to arrive now or at a set time. Confirms
-    immediately -- there is no separate hold-then-pay step.
+    immediately and pays the ``total_price`` from your resident's wallet in
+    the same step (``payment`` shows the charge and what's left); fails with
+    insufficient_funds, ordering nothing, if you can't cover it.
 
     ``items`` is a list of {"item_id": ..., "quantity": ...} using item ids
     from delivery_get_menu or delivery_search_menu_items. ``delivery_zone``
@@ -104,19 +108,26 @@ def delivery_place_order(
     kitchen starts on it.
     """
     try:
-        return orders.place(vendor_code, items, delivery_zone, contact_phone, deliver_at)
-    except orders.OrderError as e:
+        resident = caller.current(ctx)
+        return orders.place(
+            vendor_code, items, delivery_zone, contact_phone, resident["resident_id"], deliver_at=deliver_at
+        )
+    except (orders.OrderError, residents.ResidentError) as e:
         return _error(e.code, str(e), e.hint)
 
 
 @mcp.tool()
-def delivery_get_order(order_id: str) -> dict:
-    """Retrieve an order by its reference.
+def delivery_get_order(order_id: str, ctx: Context | None = None) -> dict:
+    """Retrieve one of your orders by its reference.
 
     ``status`` is computed live from elapsed time, not stored -- an order
     placed a few minutes ago may already show OUT_FOR_DELIVERY or DELIVERED.
     """
-    order = orders.get(order_id)
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
+    order = orders.get(order_id, resident["resident_id"])
     if order is None:
         return _error(
             "not_found",
@@ -127,18 +138,25 @@ def delivery_get_order(order_id: str) -> dict:
 
 
 @mcp.tool()
-def delivery_list_orders(phone: str | None = None, status: str | None = None) -> list[dict]:
-    """List orders, optionally filtered by contact phone or status.
+def delivery_list_orders(
+    phone: str | None = None, status: str | None = None, ctx: Context | None = None
+) -> list[dict]:
+    """List your orders, optionally filtered by contact phone or status.
 
     ``status`` is one of "SCHEDULED", "PREPARING", "OUT_FOR_DELIVERY",
     "DELIVERED", "CANCELLED" -- computed live, not stored.
     """
-    return orders.list_all(phone, status)
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
+    return orders.list_all(resident["resident_id"], phone, status)
 
 
 @mcp.tool()
-def delivery_cancel_order(order_id: str) -> dict:
-    """Cancel an order. Only possible while it is SCHEDULED or still
+def delivery_cancel_order(order_id: str, ctx: Context | None = None) -> dict:
+    """Cancel one of your orders for a full refund, straight back to your
+    resident's wallet. Only possible while it is SCHEDULED or still
     PREPARING.
 
     Once a courier has picked it up (OUT_FOR_DELIVERY or later), this fails
@@ -147,6 +165,7 @@ def delivery_cancel_order(order_id: str) -> dict:
     call this.
     """
     try:
-        return orders.cancel(order_id)
-    except orders.OrderError as e:
+        resident = caller.current(ctx)
+        return orders.cancel(order_id, resident["resident_id"])
+    except (orders.OrderError, residents.ResidentError) as e:
         return _error(e.code, str(e), e.hint)

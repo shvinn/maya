@@ -7,6 +7,16 @@ how it stays unique). Its wallet is the money they have: every transaction since
 the opening balance it was created with, summed on read and never stored
 (see db.py).
 
+Money can also be *held*: still the resident's, but not theirs to spend
+until the hold ends -- the deposit on a fine-dining table, say. A hold is a
+transaction of its own, with the moment it lapses by itself
+(``expires_at``); it ends sooner if it is ``release``d, and a booking that
+keeps the money turns it into a ``charge``. So a resident has a
+``balance`` (all their money), what is ``held``, and what is ``available``
+(the difference) -- and anything that costs money is checked against
+``available``. Because each hold carries its own expiry, it lapses on time
+with nothing having to write anything when it does.
+
 Everything here that creates or changes a resident is an admin operation.
 It is called from the CLI or by an orchestrator importing Maya, never from
 an MCP tool: an agent can act *as* a resident, by sending that resident's
@@ -42,7 +52,12 @@ GENDERS = ("female", "male", "non_binary", "unspecified")
 MAX_AGE = 120
 
 #: Why money moved. Credits are positive amounts, debits negative.
-KINDS = ("opening_balance", "top_up", "charge", "refund")
+MONEY_KINDS = ("opening_balance", "top_up", "charge", "refund")
+#: Money set aside and given back: shown in the history, but not money
+#: spent or received, so not part of the balance. A hold's amount is
+#: negative, its release's positive.
+HOLD_KINDS = ("hold", "release")
+KINDS = MONEY_KINDS + HOLD_KINDS
 
 _PROFILE_FIELDS = ("first_name", "last_name", "gender", "age")
 #: What update() can change: the profile, and the email.
@@ -138,6 +153,7 @@ def _public_transaction(row: sqlite3.Row) -> dict:
         "reference": row["reference"],
         "domain": row["domain"],
         "maya_time": row["maya_time"],
+        **({"expires_at": row["expires_at"]} if row["kind"] == "hold" else {}),
     }
 
 
@@ -157,6 +173,7 @@ def _record(
     reference: str | None = None,
     domain: str | None = None,
     conn: sqlite3.Connection | None = None,
+    expires_at: str | None = None,
 ) -> dict:
     """Write one transaction. Must be called inside storage.transaction(),
     alongside whatever the money is for, so both land or neither does --
@@ -166,9 +183,9 @@ def _record(
         raise ValueError(f"Unknown transaction kind {kind!r}.")
     conn = conn or db.connect()
     cursor = conn.execute(
-        "INSERT INTO transactions (resident_id, amount, kind, reference, domain, maya_time)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        (resident_id, amount, kind, reference, domain, _now()),
+        "INSERT INTO transactions (resident_id, amount, kind, reference, domain, maya_time, expires_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (resident_id, amount, kind, reference, domain, _now(), expires_at),
     )
     row = conn.execute(
         "SELECT * FROM transactions WHERE transaction_id = ?", (cursor.lastrowid,)
@@ -286,13 +303,43 @@ def get(resident_id: str) -> dict | None:
 
 
 def balance(resident_id: str, conn: sqlite3.Connection | None = None) -> int:
-    """The sum of the resident's transactions. A resident with none (or an
-    unknown id) has 0 -- check the resident exists first if that matters.
-    ``conn`` as for charge()."""
+    """All the resident's money: the sum of their money transactions, holds
+    aside (see held()). A resident with none (or an unknown id) has 0 --
+    check the resident exists first if that matters. ``conn`` as for
+    charge()."""
+    placeholders = ", ".join("?" for _ in MONEY_KINDS)
     return (conn or db.connect()).execute(
-        "SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE resident_id = ?",
-        (_normalise_id(resident_id),),
+        f"SELECT COALESCE(SUM(amount), 0) AS total FROM transactions"
+        f" WHERE resident_id = ? AND kind IN ({placeholders})",
+        (_normalise_id(resident_id), *MONEY_KINDS),
     ).fetchone()["total"]
+
+
+def held(resident_id: str, conn: sqlite3.Connection | None = None) -> int:
+    """Money of the resident's that is held right now: every hold that
+    hasn't expired and hasn't been released."""
+    return (conn or db.connect()).execute(
+        "SELECT COALESCE(SUM(-h.amount), 0) AS total FROM transactions h"
+        " WHERE h.resident_id = ? AND h.kind = 'hold' AND h.expires_at > ?"
+        " AND NOT EXISTS (SELECT 1 FROM transactions r WHERE r.kind = 'release'"
+        "   AND r.resident_id = h.resident_id AND r.reference = h.reference)",
+        (_normalise_id(resident_id), _now()),
+    ).fetchone()["total"]
+
+
+def available(resident_id: str, conn: sqlite3.Connection | None = None) -> int:
+    """What the resident can spend: their balance less what is held."""
+    return balance(resident_id, conn) - held(resident_id, conn)
+
+
+def wallet(resident_id: str, conn: sqlite3.Connection | None = None) -> dict:
+    """Balance, held and available, as callers are shown them."""
+    total, on_hold = balance(resident_id, conn), held(resident_id, conn)
+    return {
+        "balance": {"amount": total, "currency": CURRENCY},
+        "held": {"amount": on_hold, "currency": CURRENCY},
+        "available": {"amount": total - on_hold, "currency": CURRENCY},
+    }
 
 
 def list_transactions(resident_id: str) -> list[dict]:
@@ -329,26 +376,86 @@ def ready() -> None:
 def charge(conn: sqlite3.Connection, resident_id: str, amount: int, reference: str, domain: str) -> dict:
     """Debit ``amount`` for booking ``reference``, inside the booking's own
     transaction on ``conn``. Raises InsufficientFunds -- and then the
-    booking's transaction rolls back with it. Returns the transaction and
-    the balance after it."""
+    booking's transaction rolls back with it. Returns the transaction (None
+    when ``amount`` is 0: nothing moved, so nothing is recorded -- a table
+    at a restaurant that takes no deposit) and the balance after it."""
     amount = _check_amount(amount, "amount", allow_zero=True)
-    available = balance(resident_id, conn)
-    if available < amount:
+    _require_available(conn, resident_id, amount, "costs")
+    transaction = _record(resident_id, -amount, "charge", reference, domain, conn) if amount else None
+    return _moved(conn, resident_id, -amount, transaction)
+
+
+def _require_available(conn: sqlite3.Connection, resident_id: str, amount: int, verb: str) -> None:
+    free = available(resident_id, conn)
+    if free < amount:
+        on_hold = held(resident_id, conn)
         raise InsufficientFunds(
-            f"This costs {amount} {CURRENCY}; the resident's wallet has {available} {CURRENCY}."
+            f"This {verb} {amount} {CURRENCY}; the resident has {free} {CURRENCY} available"
+            + (f" ({on_hold} more is held)." if on_hold else ".")
         )
-    transaction = _record(resident_id, -amount, "charge", reference, domain, conn)
-    return {"transaction": transaction, "balance": available - amount, "currency": CURRENCY}
+
+
+def _moved(conn: sqlite3.Connection, resident_id: str, amount: int, transaction: dict | None) -> dict:
+    return {"amount": amount, "transaction": transaction, **wallet(resident_id, conn)}
 
 
 def refund(conn: sqlite3.Connection, resident_id: str, amount: int, reference: str, domain: str) -> dict:
     """Credit ``amount`` back for booking ``reference``, inside the
     cancellation's own transaction on ``conn``. Always to the resident who
     paid -- the caller passes the booking's owner, never whoever asked.
-    Returns the transaction and the balance after it."""
+    Returns the transaction (None when ``amount`` is 0 -- a deposit kept, a
+    fee not refunded) and the balance after it."""
     amount = _check_amount(amount, "amount", allow_zero=True)
-    transaction = _record(resident_id, amount, "refund", reference, domain, conn)
-    return {"transaction": transaction, "balance": balance(resident_id, conn), "currency": CURRENCY}
+    transaction = _record(resident_id, amount, "refund", reference, domain, conn) if amount else None
+    return _moved(conn, resident_id, amount, transaction)
+
+
+def hold(
+    conn: sqlite3.Connection, resident_id: str, amount: int, reference: str, domain: str, until: str
+) -> dict:
+    """Set ``amount`` aside for booking ``reference`` until ``until`` (an
+    ISO Maya time), inside the booking's own transaction on ``conn``. The
+    money stays in the balance but stops being available. Raises
+    InsufficientFunds. Nothing is recorded when ``amount`` is 0."""
+    amount = _check_amount(amount, "amount", allow_zero=True)
+    _require_available(conn, resident_id, amount, "needs a hold of")
+    transaction = (
+        _record(resident_id, -amount, "hold", reference, domain, conn, expires_at=until) if amount else None
+    )
+    return _moved(conn, resident_id, -amount, transaction)
+
+
+def release(conn: sqlite3.Connection, resident_id: str, reference: str, domain: str) -> dict:
+    """End the hold for booking ``reference`` now, if it is still on: the
+    money is available again. Returns how much was released (0, with no
+    transaction, if there was nothing held -- no deposit, or a hold that had
+    already expired)."""
+    row = conn.execute(
+        "SELECT -amount AS amount FROM transactions h WHERE h.resident_id = ? AND h.reference = ?"
+        " AND h.kind = 'hold' AND h.expires_at > ?"
+        " AND NOT EXISTS (SELECT 1 FROM transactions r WHERE r.kind = 'release'"
+        "   AND r.resident_id = h.resident_id AND r.reference = h.reference)",
+        (resident_id, reference, _now()),
+    ).fetchone()
+    amount = row["amount"] if row else 0
+    transaction = _record(resident_id, amount, "release", reference, domain, conn) if amount else None
+    return _moved(conn, resident_id, amount, transaction)
+
+
+def payment(result: dict) -> dict:
+    """What a booking or cancellation tells the caller about their wallet,
+    from charge(), refund(), hold() or release(): what happened (``kind``),
+    the money that moved or was set aside (negative for a charge or a hold),
+    its transaction id (None if nothing moved), and the wallet after it."""
+    transaction = result["transaction"]
+    return {
+        "kind": transaction["kind"] if transaction else None,
+        "transaction_id": transaction["transaction_id"] if transaction else None,
+        "amount": {"amount": result["amount"], "currency": CURRENCY},
+        "balance": result["balance"],
+        "held": result["held"],
+        "available": result["available"],
+    }
 
 
 def reset() -> int:

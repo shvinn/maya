@@ -244,18 +244,9 @@ def _book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email
         "resident_id": resident_id,
         "booked_at": clock.now().strftime("%Y-%m-%d %H:%M"),
     }
-    payment = residents.charge(db.connect(), resident_id, booking["total_price"]["amount"], reference, "flights")
+    paid = residents.charge(db.connect(), resident_id, booking["total_price"]["amount"], reference, "flights")
     _save_booking(booking)
-    return {**booking, "payment": _payment(payment)}
-
-
-def _payment(result: dict) -> dict:
-    """What a booking or cancellation tells the caller about their wallet."""
-    return {
-        "transaction_id": result["transaction"]["transaction_id"],
-        "amount": {"amount": result["transaction"]["amount"], "currency": CURRENCY},
-        "balance": {"amount": result["balance"], "currency": CURRENCY},
-    }
+    return {**booking, "payment": residents.payment(paid)}
 
 def book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email: str, resident_id: str) -> dict:
     """Book atomically: every check and write below -- the payment included
@@ -371,14 +362,14 @@ def _release(booking: dict, reason: str) -> dict:
     amount = booking["total_price"]["amount"]
     booking["refund"] = {"amount": amount, "currency": CURRENCY}
     # To the resident who paid -- the booking's owner -- whoever is asking.
-    payment = residents.refund(db.connect(), booking["resident_id"], amount, booking["booking_reference"], "flights")
+    refunded = residents.refund(db.connect(), booking["resident_id"], amount, booking["booking_reference"], "flights")
     _save_booking(booking)
     return {
         "booking_reference": booking["booking_reference"],
         "reference": booking["booking_reference"],
         "status": "CANCELLED",
         "refund": {"amount": amount, "currency": CURRENCY},
-        "payment": _payment(payment),
+        "payment": residents.payment(refunded),
         "reason": reason,
     }
 

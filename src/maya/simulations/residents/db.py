@@ -16,9 +16,11 @@ Two tables:
   wallet, starting with the ``opening_balance`` written when the resident
   is created. The wallet is not a table of its own: in v1 every resident
   has exactly one, so it is just their transactions. The balance is their
-  sum and is never stored, so it can't drift from the history. The
-  (resident_id, amount) index lets SQLite sum one resident's transactions
-  from the index alone, without reading the table.
+  sum and is never stored, so it can't drift from the history. A hold
+  (and its release) is a transaction too, with an ``expires_at``; holds
+  don't count towards the balance, only against what is available (see
+  residents.held()). The (resident_id, kind, amount) index lets SQLite sum
+  one resident's money from the index alone, without reading the table.
 
 Residents survive a world reset, and so does each wallet's opening
 balance; every other transaction goes (see residents.reset()).
@@ -73,17 +75,28 @@ def _init(conn: sqlite3.Connection) -> None:
             amount INTEGER NOT NULL,
             kind TEXT NOT NULL,
             reference TEXT, domain TEXT,
-            maya_time TEXT NOT NULL
+            maya_time TEXT NOT NULL,
+            expires_at TEXT
         );
-        CREATE INDEX IF NOT EXISTS transactions_by_resident
-            ON transactions (resident_id, amount);
+        DROP INDEX IF EXISTS transactions_by_resident;
+        CREATE INDEX IF NOT EXISTS transactions_by_resident_kind
+            ON transactions (resident_id, kind, amount);
         """
     )
     # Under the write lock: two threads opening their first connection at
     # once must not both find no email column and both try to add it.
     with storage.transaction(conn):
+        _add_hold_expiry(conn)
         _add_emails(conn)
         conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS residents_by_email ON residents (email)")
+
+
+def _add_hold_expiry(conn: sqlite3.Connection) -> None:
+    """Give a database made before holds existed the column a hold keeps
+    its expiry in. No row needs a value: there were no holds."""
+    columns = {row["name"] for row in conn.execute("PRAGMA table_info(transactions)")}
+    if "expires_at" not in columns:
+        conn.execute("ALTER TABLE transactions ADD COLUMN expires_at TEXT")
 
 
 def _add_emails(conn: sqlite3.Connection) -> None:
