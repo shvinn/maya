@@ -11,7 +11,7 @@ all follow.
 Standard `src/` layout: `src/maya/` is the one installable package.
 
 - `src/maya/simulations/<domain>/` (`flights/`, `delivery/`, `hotels/`,
-  `cars/`, `events/`) is the domain logic — reference data access, booking/ordering rules, and the shared
+  `cars/`, `events/`, `dining/`) is the domain logic — reference data access, booking/ordering rules, and the shared
   SQLite connection in that domain's own `db.py` — plus that domain's own
   `mcp_tools.py`, which is the thin `<domain>_*` MCP tool adapter for it.
   No business logic lives in a domain's `mcp_tools.py`; it calls straight
@@ -34,6 +34,19 @@ Standard `src/` layout: `src/maya/` is the one installable package.
   it), so concurrent requests can't oversell or issue the same reference.
   Report refusals with `maya.tool_errors.tool_error`, so they reach clients
   as MCP tool errors.
+- `src/maya/simulations/residents/` is who books and who pays: residents,
+  their keys and their wallets, plus the read-only `residents_*` tools.
+  Creating, changing and funding residents is admin-only (`maya residents
+  ...`) and must never become a tool. **Money moves inside the booking's own
+  transaction, on the booking's own connection:** call `residents.ready()`
+  before opening the transaction, then pass that domain's `db.connect()` to
+  `residents.charge`, `refund`, `hold` or `release` inside it — a second
+  connection would wait on the booking's write lock and fail. A tool that
+  books, cancels or shows someone's records takes `ctx: Context | None =
+  None`, finds the resident with `caller.current(ctx)`, and never takes a
+  resident id as an argument; a booking stores `resident_id`, and anyone
+  else's reference is `not_found`. Refund to the booking's owner, never to
+  the caller.
 - Reference data (airports and the weekly schedule, delivery terms,
   hotels and room types, the rental fleet, venues and event series) lives in each domain's
   `data/*.csv` — human-editable, reloaded into SQLite on every start. Edit a

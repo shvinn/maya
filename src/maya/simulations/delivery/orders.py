@@ -2,8 +2,11 @@
 
 An order is a single step, same as a flight booking: you browse a vendor's
 menu, you place the order, you are confirmed. There is no hold-then-pay
-step, no priced offer to expire, and no payments domain behind it -- the
-total is informational, the same shallow way flights' total_price is today.
+step and no priced offer to expire: the total (items plus delivery fee) is
+paid from the ordering resident's wallet in the same transaction that
+places the order (``insufficient_funds`` otherwise), and cancelling refunds
+it in full. A resident only sees and cancels their own orders; anyone
+else's is not found.
 
 Status is never stored -- it is computed live from elapsed time since
 the kitchen started (prep_starts_at), the same way flights computes seat availability from time to
@@ -32,9 +35,11 @@ list rather than a timing accident.
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timedelta
 
 from maya import storage
+from maya.simulations.residents import residents
 from maya.world import clock
 from maya.world.geography import maps
 
@@ -108,10 +113,16 @@ def _with_live_status(order: dict) -> dict:
 
 
 def _place(
-    vendor_code: str, items: list[dict], delivery_zone: str, contact_phone: str, deliver_at: str | None = None
+    vendor_code: str,
+    items: list[dict],
+    delivery_zone: str,
+    contact_phone: str,
+    resident_id: str,
+    deliver_at: str | None = None,
 ) -> dict:
-    """Confirm an order at one vendor, for now or for ``deliver_at``. Raises
-    VendorNotFound, ItemNotFound, ZoneNotDeliverable or InvalidDeliveryTime."""
+    """Confirm an order at one vendor, for now or for ``deliver_at``, paid by
+    ``resident_id``. Raises VendorNotFound, ItemNotFound,
+    ZoneNotDeliverable, InvalidDeliveryTime or residents.InsufficientFunds."""
     vendor = vendors.get(vendor_code)
     if vendor is None:
         raise VendorNotFound(f"No vendor with code {vendor_code!r}.")
@@ -171,6 +182,7 @@ def _place(
         "delivery_zone": zone.code,
         "delivery_zone_name": zone.name,
         "contact_phone": contact_phone,
+        "resident_id": resident_id,
         "subtotal": {"amount": subtotal, "currency": CURRENCY},
         "delivery_fee": {"amount": vendor.delivery_fee, "currency": CURRENCY},
         "total_price": {"amount": total, "currency": CURRENCY},
@@ -181,25 +193,40 @@ def _place(
         "prep_starts_at": prep_starts_at.strftime(_TIME_FORMAT),
         "deliver_at": (prep_starts_at + timedelta(minutes=eta_minutes)).strftime(_TIME_FORMAT),
     }
+    paid = residents.charge(db.connect(), resident_id, total, reference, "delivery")
     _save_order(order)
-    return _with_live_status(order)
+    return {**_with_live_status(order), "payment": residents.payment(paid)}
 
 def place(
-    vendor_code: str, items: list[dict], delivery_zone: str, contact_phone: str, deliver_at: str | None = None
+    vendor_code: str,
+    items: list[dict],
+    delivery_zone: str,
+    contact_phone: str,
+    resident_id: str,
+    deliver_at: str | None = None,
 ) -> dict:
-    """Place atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction)."""
+    """Place atomically: every check and write below -- the payment
+    included -- happens in one transaction (see maya.storage.transaction)."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _place(vendor_code, items, delivery_zone, contact_phone, deliver_at)
+        return _place(vendor_code, items, delivery_zone, contact_phone, resident_id, deliver_at)
 
 
-def get(order_id: str) -> dict | None:
+def _owned(order_id: str, resident_id: str) -> dict | None:
+    """The order, if ``resident_id`` owns it. Someone else's order is
+    None, exactly like one that doesn't exist, so a reference never
+    confirms that another resident's order is there."""
     order = _get_order((order_id or "").strip().upper())
+    return order if order and order.get("resident_id") == resident_id else None
+
+
+def get(order_id: str, resident_id: str) -> dict | None:
+    order = _owned(order_id, resident_id)
     return _with_live_status(order) if order else None
 
 
-def list_all(phone: str | None = None, status: str | None = None) -> list[dict]:
-    out = [_with_live_status(o) for o in _all_orders()]
+def list_all(resident_id: str, phone: str | None = None, status: str | None = None) -> list[dict]:
+    out = [_with_live_status(o) for o in _all_orders() if o.get("resident_id") == resident_id]
     if phone:
         needle = phone.strip()
         out = [o for o in out if o["contact_phone"] == needle]
@@ -209,10 +236,11 @@ def list_all(phone: str | None = None, status: str | None = None) -> list[dict]:
     return sorted(out, key=lambda o: o["placed_at"])
 
 
-def _cancel(order_id: str) -> dict:
-    """Cancel an order. Only possible while it is SCHEDULED or still
-    PREPARING; once a courier has it, it can't be recalled."""
-    order = _get_order((order_id or "").strip().upper())
+def _cancel(order_id: str, resident_id: str) -> dict:
+    """Cancel an order, for a full refund. Only possible while it is
+    SCHEDULED or still PREPARING; once a courier has it, it can't be
+    recalled."""
+    order = _owned(order_id, resident_id)
     if order is None:
         raise NotFound(f"No order with reference {order_id!r}.")
 
@@ -227,28 +255,34 @@ def _cancel(order_id: str) -> dict:
         )
 
     order["cancelled"] = True
+    refund = {"amount": order["total_price"]["amount"], "currency": CURRENCY}
+    order["refund"] = refund
+    # To the resident who paid -- the order's owner -- whoever is asking.
+    refunded = residents.refund(db.connect(), order["resident_id"], refund["amount"], order["order_id"], "delivery")
     _save_order(order)
     return {
         "order_id": order["order_id"],
         "reference": order["order_id"],
         "status": "CANCELLED",
-        "reason": "Cancelled before the courier picked it up.",
+        "refund": refund,
+        "payment": residents.payment(refunded),
+        "reason": "Cancelled before the courier picked it up: full refund.",
     }
 
-def cancel(order_id: str) -> dict:
-    """Cancel atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction)."""
+def cancel(order_id: str, resident_id: str) -> dict:
+    """Cancel atomically: every check and write below -- the refund
+    included -- happens in one transaction (see maya.storage.transaction)."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _cancel(order_id)
+        return _cancel(order_id, resident_id)
 
 
-def reset() -> int:
+def reset(conn: sqlite3.Connection) -> int:
     """Empty all orders. Part of a world reset (see maya.reset).
 
     Returns the number of orders cleared.
     """
-    cleared = db.reset_world()
-    return cleared
+    return db.reset_world(conn)
 
 
 class OrderError(Exception):

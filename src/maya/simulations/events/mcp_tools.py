@@ -7,8 +7,9 @@ lives here -- same pattern as simulations/hotels/mcp_tools.py.
 
 from __future__ import annotations
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 
+from maya.simulations.residents import caller, residents
 from maya.tool_errors import tool_error as _error
 from maya.world.mcp_tools import add_time_tool
 
@@ -89,9 +90,12 @@ def events_book_tickets(
     attendee_name: str,
     contact_email: str,
     youngest_attendee_age: int | None = None,
+    ctx: Context | None = None,
 ) -> dict:
-    """Buy tickets in one section of one performance. Confirms immediately --
-    there is no hold or payment step.
+    """Buy tickets in one section of one performance. Confirms immediately
+    and pays the ``total_price`` from your resident's wallet in the same
+    step (``payment`` shows the charge and what's left); fails with
+    insufficient_funds, booking nothing, if you can't cover it.
 
     ``total_price`` is (face price + service fee) x quantity. Fails with
     ticket_limit_exceeded above the show's max_tickets_per_order,
@@ -100,21 +104,27 @@ def events_book_tickets(
     left than ``quantity``, and sales_closed once the show has started.
     """
     try:
+        resident = caller.current(ctx)
         return tickets.book(
-            event_id, date, section_id, quantity, attendee_name, contact_email, youngest_attendee_age
+            event_id, date, section_id, quantity, attendee_name, contact_email, resident["resident_id"],
+            youngest_attendee_age=youngest_attendee_age,
         )
-    except tickets.TicketError as e:
+    except (tickets.TicketError, residents.ResidentError) as e:
         return _error(e.code, str(e), e.hint)
 
 
 @mcp.tool()
-def events_get_booking(reference: str) -> dict:
-    """Retrieve a booking by its reference.
+def events_get_booking(reference: str, ctx: Context | None = None) -> dict:
+    """Retrieve one of your bookings by its reference.
 
     ``status`` is computed live: CONFIRMED until the show starts,
     IN_PROGRESS while it's on, then ENDED.
     """
-    booking = tickets.get(reference)
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
+    booking = tickets.get(reference, resident["resident_id"])
     if booking is None:
         return _error(
             "not_found",
@@ -125,25 +135,32 @@ def events_get_booking(reference: str) -> dict:
 
 
 @mcp.tool()
-def events_list_bookings(email: str | None = None, status: str | None = None) -> list[dict]:
-    """List bookings, optionally filtered by contact email or status.
+def events_list_bookings(
+    email: str | None = None, status: str | None = None, ctx: Context | None = None
+) -> list[dict]:
+    """List your bookings, optionally filtered by contact email or status.
 
     ``status`` is one of "CONFIRMED", "IN_PROGRESS", "ENDED", "CANCELLED" --
     computed live, not stored.
     """
-    return tickets.list_all(email, status)
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
+    return tickets.list_all(resident["resident_id"], email, status)
 
 
 @mcp.tool()
-def events_cancel_booking(reference: str) -> dict:
-    """Cancel a booking. Refunds face value only -- the service fee is never
-    refunded.
+def events_cancel_booking(reference: str, ctx: Context | None = None) -> dict:
+    """Cancel one of your bookings. Refunds face value only, straight back
+    to your resident's wallet -- the service fee is never refunded.
 
     Each show has its own refund window (see refund_policy): inside it this
     fails with too_late_to_cancel, and non-refundable shows always fail with
     not_refundable. Cancelled tickets go back on sale.
     """
     try:
-        return tickets.cancel(reference)
-    except tickets.TicketError as e:
+        resident = caller.current(ctx)
+        return tickets.cancel(reference, resident["resident_id"])
+    except (tickets.TicketError, residents.ResidentError) as e:
         return _error(e.code, str(e), e.hint)

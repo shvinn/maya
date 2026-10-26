@@ -38,15 +38,24 @@ A connection's fare is the sum of its legs' fares, less
 ``CONNECTION_DISCOUNT`` when both legs are on the same airline -- an airline
 prices its own connections to compete with a rival's direct flight, while
 a connection across two airlines (an interline) gets no such deal.
+
+Every booking belongs to the resident who made it (``resident_id``), and is
+paid for from their wallet in the same transaction that takes the seats: no
+money, no booking (``insufficient_funds``). Only that resident can see or
+cancel it -- anyone else is told there is no such booking -- and a refund
+goes back to them. Bookings stored before residents existed have no owner,
+so no one can reach them; a world reset clears them.
 """
 
 from __future__ import annotations
 
 import json
+import sqlite3
 import random
 from datetime import datetime, timedelta
 
 from maya import storage
+from maya.simulations.residents import residents
 from maya.world import clock
 
 from . import db, operations, schedule
@@ -196,11 +205,12 @@ def _legs(booking: dict) -> list[dict]:
     return booking.get("legs") or [booking]
 
 
-def _book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email: str) -> dict:
+def _book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email: str, resident_id: str) -> dict:
     """Confirm a booking on one flight, or two for a one-stop connection
-    (the caller has already checked the pair is a valid connection). Raises
-    ``SoldOut`` if any leg doesn't have the seats -- and then nothing is
-    booked, not even the leg that did."""
+    (the caller has already checked the pair is a valid connection), and
+    charge ``resident_id`` for it. Raises ``SoldOut`` if any leg doesn't
+    have the seats, or ``residents.InsufficientFunds`` if the wallet can't
+    cover it -- and then nothing is booked, not even the leg that did."""
     count = len(passenger_names)
     for flight in legs:
         if seats_available(flight) < count:
@@ -232,17 +242,21 @@ def _book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email
         **({"connection_discount_per_passenger": {"amount": discount, "currency": CURRENCY}} if discount else {}),
         "total_price": {"amount": fare * count, "currency": CURRENCY},
         "contact_email": contact_email,
+        "resident_id": resident_id,
         "booked_at": clock.now().strftime("%Y-%m-%d %H:%M"),
     }
+    paid = residents.charge(db.connect(), resident_id, booking["total_price"]["amount"], reference, "flights")
     _save_booking(booking)
-    return booking
+    return {**booking, "payment": residents.payment(paid)}
 
-def book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email: str) -> dict:
-    """Book atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction), so concurrent bookings
-    can't both take the last of anything."""
+def book(legs: list[ScheduledFlight], passenger_names: list[str], contact_email: str, resident_id: str) -> dict:
+    """Book atomically: every check and write below -- the payment included
+    -- happens in one transaction (see maya.storage.transaction), so
+    concurrent bookings can't both take the last of anything, or both spend
+    the same money."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _book(legs, passenger_names, contact_email)
+        return _book(legs, passenger_names, contact_email, resident_id)
 
 
 def _flight(leg: dict) -> ScheduledFlight | None:
@@ -279,13 +293,21 @@ def _public(booking: dict) -> dict:
     return booking
 
 
-def get(reference: str) -> dict | None:
+def _owned(reference: str, resident_id: str) -> dict | None:
+    """The booking, if ``resident_id`` owns it. Someone else's booking is
+    None, exactly like one that doesn't exist, so a reference never
+    confirms that another resident's booking is there."""
     booking = _get_booking((reference or "").strip().upper())
+    return booking if booking and booking.get("resident_id") == resident_id else None
+
+
+def get(reference: str, resident_id: str) -> dict | None:
+    booking = _owned(reference, resident_id)
     return _public(booking) if booking else None
 
 
-def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
-    out = [_public(b) for b in _all_bookings()]
+def list_all(resident_id: str, email: str | None = None, status: str | None = None) -> list[dict]:
+    out = [_public(b) for b in _all_bookings() if b.get("resident_id") == resident_id]
     if email:
         needle = email.strip().lower()
         out = [b for b in out if b["contact_email"].lower() == needle]
@@ -295,12 +317,12 @@ def list_all(email: str | None = None, status: str | None = None) -> list[dict]:
     return sorted(out, key=lambda b: (b["date"], b["departure"]))
 
 
-def _cancel(reference: str) -> dict:
+def _cancel(reference: str, resident_id: str) -> dict:
     """Cancel a booking. Puffin Air fares can never be cancelled. Everyone
     else can cancel for a full refund any time up to 24 hours before
     departure; inside that window cancellation isn't possible at all. A
     cancelled flight, missed connection or long delay overrides both rules."""
-    booking = _get_booking((reference or "").strip().upper())
+    booking = _owned(reference, resident_id)
     if booking is None:
         raise NotFound(f"No booking with reference {reference!r}.")
     if booking["status"] == "CANCELLED":
@@ -340,30 +362,34 @@ def _release(booking: dict, reason: str) -> dict:
 
     amount = booking["total_price"]["amount"]
     booking["refund"] = {"amount": amount, "currency": CURRENCY}
+    # To the resident who paid -- the booking's owner -- whoever is asking.
+    refunded = residents.refund(db.connect(), booking["resident_id"], amount, booking["booking_reference"], "flights")
     _save_booking(booking)
     return {
         "booking_reference": booking["booking_reference"],
         "reference": booking["booking_reference"],
         "status": "CANCELLED",
         "refund": {"amount": amount, "currency": CURRENCY},
+        "payment": residents.payment(refunded),
         "reason": reason,
     }
 
-def cancel(reference: str) -> dict:
-    """Cancel atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction), so two requests can't
-    cancel the same booking twice or release its inventory twice."""
+def cancel(reference: str, resident_id: str) -> dict:
+    """Cancel atomically: every check and write below -- the refund
+    included -- happens in one transaction (see maya.storage.transaction),
+    so two requests can't cancel the same booking twice, or release its
+    inventory or refund it twice."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _cancel(reference)
+        return _cancel(reference, resident_id)
 
 
-def reset() -> int:
+def reset(conn: sqlite3.Connection) -> int:
     """Empty all bookings and seat counts. Part of a world reset (see maya.reset).
 
     Returns the number of bookings cleared.
     """
-    cleared = db.reset_world()
-    return cleared
+    return db.reset_world(conn)
 
 
 class BookingError(Exception):

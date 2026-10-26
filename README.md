@@ -83,6 +83,18 @@ running from a clone, otherwise in your user data folder
 Linux, `%LOCALAPPDATA%\maya` on Windows). Set `MAYA_DB_PATH` to put it
 somewhere else.
 
+> **Guests can only look; to book, create a resident and use its key.**
+> Without a key, an agent is a guest: it can search, browse and check
+> status, but not book, cancel or see bookings. For that, create a resident
+> once from a terminal and give its key to your MCP client:
+>
+> ```bash
+> uv run maya residents create --first-name Lena --last-name Okafor --age 34
+> ```
+>
+> The key is printed once. See [Residents and money](#residents-and-money).
+> This holds in every domain.
+
 ## Usage
 
 Each domain is its own MCP server. Run one over HTTP:
@@ -94,6 +106,7 @@ uv run maya serve --domain hotels     # hotels, same, :6292
 uv run maya serve --domain cars       # car rental, same, :6292
 uv run maya serve --domain events     # events, same, :6292
 uv run maya serve --domain dining     # dining, same, :6292
+uv run maya serve --domain residents  # your own resident profile and wallet, same, :6292
 uv run maya serve --domain world      # world controls (clock, reset), same, :6292
 uv run maya serve --domain all        # all at once, one port, one path each:
                                        #   http://localhost:6292/flights/mcp
@@ -102,6 +115,7 @@ uv run maya serve --domain all        # all at once, one port, one path each:
                                        #   http://localhost:6292/cars/mcp
                                        #   http://localhost:6292/events/mcp
                                        #   http://localhost:6292/dining/mcp
+                                       #   http://localhost:6292/residents/mcp
                                        #   http://localhost:6292/world/mcp
 ```
 
@@ -125,20 +139,91 @@ own name for it, such as `booking_reference`, `rental_reference` or
 `order_id`, is still there too.) Bookings are atomic: two agents racing for
 the last seat can't both get it.
 
+### Residents and money
+
+| | Guest (no key) | Resident (with its key) |
+|---|---|---|
+| Search, browse, menus, availability, flight status | ✅ | ✅ |
+| Book, order, rent, reserve, cancel | ❌ `resident_required` | ✅ paid from, and refunded to, their wallet |
+| See bookings, orders, rentals, reservations | ❌ `resident_required` | ✅ their own only |
+| Profile, balance, transactions (`residents` server) | ❌ `resident_required` | ✅ their own, read-only |
+
+**Guests can only read.** Anything that writes — booking, ordering,
+cancelling — or that is about a person needs a resident, and the
+resident's key, in every domain.
+
+Booking acts as a **resident**: a person in Maya with a profile (name,
+gender, age, email) and a wallet. The price is paid from their wallet in
+the same step that takes the seat, room, car, ticket or order, so with too
+little money nothing is booked (`insufficient_funds`). A cancellation
+refunds on each domain's own terms, always to the wallet that paid:
+
+| Domain | Paid on booking | Back on cancelling |
+|---|---|---|
+| Flights | The fare | All of it, inside the fare's rules |
+| Hotels | The stay | All of it, before the hotel's cutoff |
+| Cars | The rental | All of it, before pickup |
+| Delivery | Items and delivery fee | All of it, while it's still being prepared |
+| Events | Tickets and service fee | The face value; the fee is kept |
+| Dining | Nothing — fine dining *holds* a deposit | The hold is released in time; late, the deposit is charged |
+
+A **hold** is money that stays in the wallet but can't be spent until the
+booking is over: a fine-dining table holds `deposit_per_guest × party` until
+the end of the sitting, then the hold lapses by itself and nothing is
+spent. So a wallet has a `balance` (all of it), `held`, and `available`
+(what can be spent), and every booking is checked against `available`.
+
+A resident only ever sees and cancels their own bookings — anyone else's
+reference comes back `not_found`.
+
+**1. Create a resident.** You do this from a terminal, never an agent —
+there is no tool for it, and the server doesn't need to be running:
+
+```bash
+uv run maya residents create --first-name Lena --last-name Okafor --age 34
+# Created R-000001  Lena Okafor (unspecified, 34)  lena.okafor@example.com. Balance: 5000 bucks.
+# Resident key (shown once — save it now):
+#   maya_rk_...
+```
+
+`--gender`, `--email` (default `first.last@example.com`, numbered if taken)
+and `--opening-balance` (default 5000) are optional. `uv run maya residents
+--help` lists the rest: `list`, `show`, `update`, `add-funds`, `rotate-key`
+and `transactions`. In Docker, run them in the container:
+`docker compose exec maya maya residents create ...`.
+
+**2. Give the key to your MCP client.** For example, Claude Code over HTTP:
+
+```bash
+claude mcp add --transport http maya-flights http://localhost:6292/flights/mcp \
+  --header "Authorization: Bearer maya_rk_..."
+claude mcp add --transport http maya-residents http://localhost:6292/residents/mcp \
+  --header "Authorization: Bearer maya_rk_..."
+```
+
+The MCP client sends the key, so the agent never sees it and can't switch
+to someone else: over HTTP as an `Authorization: Bearer <key>` header, and
+over stdio as `MAYA_RESIDENT_KEY` in the server's environment. Without one,
+booking, cancelling and listing bookings fail with `resident_required`. The
+`residents` server lets the agent read its own profile, balance and
+transactions; it can't change them.
+
+A world reset keeps residents and their keys, and puts every wallet back to
+its opening balance.
+
 ## World controls
 
-Whoever runs the world — you, or a test harness — controls its clock, its
-luck and resets from the `world` server (`maya mcp world`, `/world/mcp`).
-Give the agent you're testing only the domain servers: it can read the
-time, but can't skip past its own deadlines, see the seed, or wipe the
-world.
+Whoever runs the world — you, or a test harness — controls its clock and
+its luck from the `world` server (`maya mcp world`, `/world/mcp`), and
+resets it from a terminal. Give the agent you're testing only the domain
+servers: it can read the time, but can't skip past its own deadlines, see
+the seed, or wipe the world.
 
 | Tool (on the `world` server) | Effect |
 | --- | --- |
 | `world_get_time` | What time it is in Maya (also on every domain server) |
 | `world_advance_time(minutes, hours, days)` | Move ahead by a duration — forward only |
 | `world_set_time(maya_time)` | Move ahead to a moment, e.g. `2030-03-08 09:00` — forward only |
-| `world_reset(seed)` | Start over: empty every domain, go back to real time, and reseed the world's luck |
 | `world_get_seed` | This world's seed, to replay it |
 | `world_set_flight_status(flight_number, date, delay_minutes, cancelled)` | Decide one flight's fate, to stage a disruption |
 
@@ -163,16 +248,23 @@ Flights run late and get cancelled, by chance, at rates set by each airline
 the **world seed**, not the clock: the seed decides *what* happens to a
 flight, the clock only *when* it's announced. Within one world the seed is
 consistent, and every reset draws a new one, so nothing can be learned from
-a previous run. For repeatable runs, pin it: `world_reset(seed=42)`,
-`uv run maya reset --seed 42`, or `MAYA_SEED=42` in the environment. To
+a previous run. For repeatable runs, pin it: `uv run maya reset --seed 42`,
+or `MAYA_SEED=42` in the environment. To
 stage one disruption exactly, use `world_set_flight_status`.
 
 ### Reset
 
-A reset — `world_reset`, or `uv run maya reset` from a terminal — empties
-every domain's bookings, orders, rentals, tickets and reservations, drops
-flight overrides, returns the clock to real time and reseeds the world, all
-at once. It's the only way time goes backwards.
+`uv run maya reset` (in Docker, `docker compose exec maya maya reset`)
+empties every domain's bookings, orders, rentals, tickets and reservations,
+drops flight overrides, returns the clock to real time and reseeds the
+world, all at once — one transaction, so nothing can happen halfway. It's
+the only way time goes backwards. Residents and their keys stay, but every
+wallet goes back to the balance it was created with: top-ups and holds go
+too.
+
+There is no reset tool: a reset wipes every resident's bookings and money,
+so it's yours to run from a terminal, never an agent's. A harness that
+imports Maya calls `maya.reset.reset_world(seed)`.
 
 ## Run with Docker
 
@@ -187,6 +279,7 @@ docker run -p 127.0.0.1:6292:6292 -v maya-data:/data ghcr.io/shvinn/maya
                                        #   http://localhost:6292/cars/mcp
                                        #   http://localhost:6292/events/mcp
                                        #   http://localhost:6292/dining/mcp
+                                       #   http://localhost:6292/residents/mcp
                                        #   http://localhost:6292/world/mcp
 docker run -p 127.0.0.1:6292:6292 -v maya-data:/data ghcr.io/shvinn/maya serve --domain hotels
 docker compose up                      # same as the first, from a clone
@@ -195,19 +288,43 @@ docker compose up                      # same as the first, from a clone
 - Bookings, orders and rentals live in the `maya-data` volume, so they
   survive restarts and are shared by every container using it. Remove the
   volume (`docker volume rm maya-data`) for a fresh world.
-- Publish the port on `127.0.0.1` as above: the server has no
-  authentication.
+- Publish the port on `127.0.0.1` as above. Resident keys decide whom a
+  booking is for, but they travel unencrypted, and the `world` server
+  (clock, reset) answers anyone who can connect.
 - Images are built for `linux/amd64` and `linux/arm64`, which covers Linux,
   macOS (Intel and Apple Silicon) and Windows (x64 and ARM, via Docker
   Desktop's default Linux containers).
 
 ## Connect an MCP client
 
-Pick one of three setups. Each gives you seven servers: `flights`,
-`delivery`, `hotels`, `cars`, `events`, `dining` and `world`. Give the agent
-you're testing the domain servers; keep `world` (the clock and reset
-controls) for yourself, so the agent can't skip past its own deadlines or
-wipe the world.
+Pick one of three setups. Each gives you eight servers: `flights`,
+`delivery`, `hotels`, `cars`, `events`, `dining`, `residents` and `world`.
+Give the agent you're testing the domain servers and `residents`; keep
+`world` (the clock and reset controls) for yourself, so the agent can't
+skip past its own deadlines or wipe the world.
+
+**First, get a resident key** — without one, the agent is a guest, and a
+guest can't book (see [Residents and money](#residents-and-money)):
+
+```bash
+uv run maya residents create --first-name Lena --last-name Okafor --age 34
+# Resident key (shown once -- save it now):
+#   maya_rk_...
+```
+
+In Docker, run it against the same volume the server uses:
+`docker run --rm -v maya-data:/data ghcr.io/shvinn/maya residents create ...`.
+
+Every domain server and `residents` gets the key; `world` doesn't need one.
+Where it goes depends on the setup:
+
+| Setup | Key format |
+|---|---|
+| stdio (1, 2) | `"env": { "MAYA_RESIDENT_KEY": "maya_rk_..." }` on each server |
+| HTTP (3) | an `Authorization: Bearer maya_rk_...` header on each server |
+
+Replace `maya_rk_...` with your key. One key is one resident; to act as
+someone else, use their key.
 
 ### 1. Local, from a clone (stdio)
 
@@ -217,12 +334,13 @@ MCP clients don't start servers from inside it.
 ```json
 {
   "mcpServers": {
-    "maya-flights": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "flights"] },
-    "maya-delivery": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "delivery"] },
-    "maya-hotels": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "hotels"] },
-    "maya-cars": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "cars"] },
-    "maya-events": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "events"] },
-    "maya-dining": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "dining"] },
+    "maya-flights": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "flights"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-delivery": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "delivery"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-hotels": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "hotels"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-cars": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "cars"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-events": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "events"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-dining": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "dining"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-residents": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "residents"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
     "maya-world": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "world"] }
   }
 }
@@ -230,24 +348,26 @@ MCP clients don't start servers from inside it.
 
 No clone? Swap `uv run --directory /path/to/maya` for
 `uvx --from git+https://github.com/shvinn/maya`, and add
-`"env": {"MAYA_DB_PATH": "/path/to/maya.db"}` if you want the bookings
+`"MAYA_DB_PATH": "/path/to/maya.db"` to each `env` if you want the bookings
 somewhere other than your user data folder. `uvx` caches what it installs;
 add `--refresh` once to pick up a newer Maya.
 
 ### 2. Docker, no clone (stdio)
 
 Each client session starts a short-lived container; all of them share the
-`maya-data` volume, so they share one world.
+`maya-data` volume, so they share one world. `-e MAYA_RESIDENT_KEY` passes
+the key from the entry's `env` into the container.
 
 ```json
 {
   "mcpServers": {
-    "maya-flights": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "flights"] },
-    "maya-delivery": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "delivery"] },
-    "maya-hotels": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "hotels"] },
-    "maya-cars": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "cars"] },
-    "maya-events": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "events"] },
-    "maya-dining": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "dining"] },
+    "maya-flights": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "flights"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-delivery": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "delivery"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-hotels": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "hotels"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-cars": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "cars"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-events": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "events"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-dining": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "dining"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-residents": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "residents"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
     "maya-world": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "world"] }
   }
 }
@@ -257,38 +377,52 @@ Each client session starts a short-lived container; all of them share the
 
 Start one server for every domain — `docker run -p 127.0.0.1:6292:6292 -v
 maya-data:/data ghcr.io/shvinn/maya`, `docker compose up`, or
-`uv run maya serve --domain all` — and point the client at its URLs. The
-config format varies by client; for example, Claude Code:
+`uv run maya serve --domain all` — and point the client at its URLs, sending
+the key as a header. The config format varies by client; for example,
+Claude Code, with the key in your shell first
+(`export MAYA_RESIDENT_KEY=maya_rk_...`):
 
 ```bash
-claude mcp add --transport http maya-flights http://localhost:6292/flights/mcp
-claude mcp add --transport http maya-delivery http://localhost:6292/delivery/mcp
-claude mcp add --transport http maya-hotels http://localhost:6292/hotels/mcp
-claude mcp add --transport http maya-cars http://localhost:6292/cars/mcp
-claude mcp add --transport http maya-events http://localhost:6292/events/mcp
-claude mcp add --transport http maya-dining http://localhost:6292/dining/mcp
+claude mcp add --transport http maya-flights http://localhost:6292/flights/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-delivery http://localhost:6292/delivery/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-hotels http://localhost:6292/hotels/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-cars http://localhost:6292/cars/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-events http://localhost:6292/events/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-dining http://localhost:6292/dining/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-residents http://localhost:6292/residents/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
 claude mcp add --transport http maya-world http://localhost:6292/world/mcp
 ```
 
-or a project's `.mcp.json`:
+or a project's `.mcp.json`, which reads `${MAYA_RESIDENT_KEY}` from your
+environment when the client starts, so the file itself holds no key and is
+safe to commit:
 
 ```json
 {
   "mcpServers": {
-    "maya-flights": { "type": "http", "url": "http://localhost:6292/flights/mcp" },
-    "maya-delivery": { "type": "http", "url": "http://localhost:6292/delivery/mcp" },
-    "maya-hotels": { "type": "http", "url": "http://localhost:6292/hotels/mcp" },
-    "maya-cars": { "type": "http", "url": "http://localhost:6292/cars/mcp" },
-    "maya-events": { "type": "http", "url": "http://localhost:6292/events/mcp" },
-    "maya-dining": { "type": "http", "url": "http://localhost:6292/dining/mcp" },
+    "maya-flights": { "type": "http", "url": "http://localhost:6292/flights/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-delivery": { "type": "http", "url": "http://localhost:6292/delivery/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-hotels": { "type": "http", "url": "http://localhost:6292/hotels/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-cars": { "type": "http", "url": "http://localhost:6292/cars/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-events": { "type": "http", "url": "http://localhost:6292/events/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-dining": { "type": "http", "url": "http://localhost:6292/dining/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-residents": { "type": "http", "url": "http://localhost:6292/residents/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
     "maya-world": { "type": "http", "url": "http://localhost:6292/world/mcp" }
   }
 }
 ```
 
 Clients that only speak stdio can bridge to a URL with `npx mcp-remote <url>`.
-On another machine, replace `localhost` with its address — but Maya has no
-authentication and everyone connected shares one world, so keep it on a
+On another machine, replace `localhost` with its address — but resident
+keys travel over plain HTTP, the `world` server (clock, reset) is open to
+anyone connected, and everyone shares one world, so keep it on a
 private network or behind a VPN, never on the open internet.
 
 ## Contributing

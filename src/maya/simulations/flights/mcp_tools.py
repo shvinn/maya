@@ -9,14 +9,20 @@ search -> hold -> pay lifecycle (no held offers, no separate pay step);
 booking is the one step ``flights_book_flight`` describes: search, book,
 confirmed. Delays and cancellations are only ever found by asking --
 nothing is pushed to the caller.
+
+Searching and flight status are open to anyone. Booking, cancelling and
+reading bookings act as the calling resident (see
+maya.simulations.residents.caller): a booking is paid for from their wallet,
+and they only ever see and cancel their own.
 """
 
 from __future__ import annotations
 
 from datetime import date as Date
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 
+from maya.simulations.residents import caller, residents
 from maya.tool_errors import tool_error as _error
 from maya.world.mcp_tools import add_time_tool
 
@@ -112,11 +118,15 @@ def flights_book_flight(
     contact_email: str,
     connecting_flight_number: str | None = None,
     connecting_date: str | None = None,
+    ctx: Context | None = None,
 ) -> dict:
     """Book a flight found via flights_search_flights -- direct, or a
     one-stop connection as one booking.
 
-    Confirms immediately: there is no separate hold-then-pay step. ``date``
+    Confirms immediately and pays the ``total_price`` from your resident's
+    wallet in the same step; ``payment`` shows the charge and the balance
+    left. Fails with insufficient_funds (and books nothing) if the wallet
+    can't cover it. There is no separate hold-then-pay step. ``date``
     is ``YYYY-MM-DD`` and must be a date the flight actually operates on.
     For a connection, pass the option's first leg as ``flight_number`` /
     ``date`` and its second leg as ``connecting_flight_number`` /
@@ -124,6 +134,10 @@ def flights_book_flight(
     departs the next day). Both legs are booked together or not at all, and
     fails with invalid_connection if the pair isn't a valid connection.
     """
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
     legs = []
     for number, day_text in (
         (flight_number, date),
@@ -161,8 +175,8 @@ def flights_book_flight(
                 "Book a connection exactly as flights_search_flights returned it.",
             )
     try:
-        return bookings.book(legs, passenger_names, contact_email)
-    except bookings.BookingError as e:
+        return bookings.book(legs, passenger_names, contact_email, resident["resident_id"])
+    except (bookings.BookingError, residents.ResidentError) as e:
         return _error(e.code, str(e), e.hint)
 
 
@@ -191,14 +205,18 @@ def flights_get_flight_status(flight_number: str, date: str) -> dict:
 
 
 @mcp.tool()
-def flights_get_booking(booking_reference: str) -> dict:
-    """Retrieve a booking by its reference.
+def flights_get_booking(booking_reference: str, ctx: Context | None = None) -> dict:
+    """Retrieve one of your bookings by its reference.
 
     Each leg carries its live ``flight_status``, ``delay_minutes`` and
     estimated times, and ``disruption`` sums it up: FLIGHT_CANCELLED,
     MISSED_CONNECTION, LONG_DELAY (3 hours or more), DELAYED, or null.
     """
-    booking = bookings.get(booking_reference)
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
+    booking = bookings.get(booking_reference, resident["resident_id"])
     if booking is None:
         return _error(
             "not_found",
@@ -209,15 +227,22 @@ def flights_get_booking(booking_reference: str) -> dict:
 
 
 @mcp.tool()
-def flights_list_bookings(email: str | None = None, status: str | None = None) -> list[dict]:
-    """List bookings, optionally filtered by contact email or status."""
-    return bookings.list_all(email, status)
+def flights_list_bookings(
+    email: str | None = None, status: str | None = None, ctx: Context | None = None
+) -> list[dict]:
+    """List your bookings, optionally filtered by contact email or status."""
+    try:
+        resident = caller.current(ctx)
+    except residents.ResidentError as e:
+        return _error(e.code, str(e), e.hint)
+    return bookings.list_all(resident["resident_id"], email, status)
 
 
 @mcp.tool()
-def flights_cancel_booking(booking_reference: str) -> dict:
-    """Cancel a booking -- both legs together, for a connection. Applies the
-    fare's refund rule.
+def flights_cancel_booking(booking_reference: str, ctx: Context | None = None) -> dict:
+    """Cancel one of your bookings -- both legs together, for a connection.
+    Applies the fare's refund rule; a refund goes straight back to your
+    resident's wallet (see ``payment``).
 
     Puffin Air fares can never be cancelled (fails with ``not_refundable``).
     Everyone else can cancel for a full refund any time up to 24 hours before
@@ -228,6 +253,7 @@ def flights_cancel_booking(booking_reference: str) -> dict:
     only until the first flight leaves).
     """
     try:
-        return bookings.cancel(booking_reference)
-    except bookings.BookingError as e:
+        resident = caller.current(ctx)
+        return bookings.cancel(booking_reference, resident["resident_id"])
+    except (bookings.BookingError, residents.ResidentError) as e:
         return _error(e.code, str(e), e.hint)

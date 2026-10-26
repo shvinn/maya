@@ -4,8 +4,10 @@ Each ``simulations/<domain>/`` package owns its own ``mcp_tools.py`` -- that
 domain's ``MCPServer`` and its tool registrations (see
 ``simulations/flights/mcp_tools.py``, ``simulations/delivery/mcp_tools.py``,
 ``simulations/hotels/mcp_tools.py``, ``simulations/cars/mcp_tools.py``,
-``simulations/events/mcp_tools.py``, ``simulations/dining/mcp_tools.py`` and ``world/mcp_tools.py`` -- the world
-clock's controls, deliberately a server of their own).
+``simulations/events/mcp_tools.py``, ``simulations/dining/mcp_tools.py``,
+``simulations/residents/mcp_tools.py`` -- what a resident can see about
+themselves -- and ``world/mcp_tools.py`` -- the world clock's controls,
+deliberately a server of their own).
 This file defines no tools itself; it is just the one place ``cli.py`` looks
 to find every domain that exists.
 """
@@ -18,6 +20,7 @@ from .simulations.dining.mcp_tools import mcp as dining_mcp
 from .simulations.events.mcp_tools import mcp as events_mcp
 from .simulations.flights.mcp_tools import mcp as flights_mcp
 from .simulations.hotels.mcp_tools import mcp as hotels_mcp
+from .simulations.residents.mcp_tools import mcp as residents_mcp
 from .world.mcp_tools import mcp as world_mcp
 
 SERVERS = {
@@ -27,6 +30,7 @@ SERVERS = {
     "cars": cars_mcp,
     "events": events_mcp,
     "dining": dining_mcp,
+    "residents": residents_mcp,
     "world": world_mcp,
 }
 

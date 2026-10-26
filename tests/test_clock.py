@@ -124,17 +124,16 @@ def test_every_domain_can_read_the_time_but_only_world_can_change_it():
     for name, server in SERVERS.items():
         tools = {t.name for t in asyncio.run(server.list_tools())}
         assert "world_get_time" in tools, name
-        controls = {"world_set_time", "world_advance_time", "world_reset", "world_get_seed", "world_set_flight_status"}
+        controls = {"world_set_time", "world_advance_time", "world_get_seed", "world_set_flight_status"}
         assert (controls <= tools) == (name == "world"), name
-        assert not any("reset" in t for t in tools - {"world_reset"}), name  # only world resets
+        assert not any("reset" in t for t in tools), name  # resetting is the admin's, from a terminal
 
 
-def test_world_reset_tool_clears_everything(real):
+def test_skipped_time_and_bookings_go_together_in_a_reset(real):
     world.world_advance_time(days=2)
     delivery.delivery_place_order("OQN", [{"item_id": "OQN-01", "quantity": 1}], "AIR-OLD", "+1")
-    result = world.world_reset()
-    assert result["cleared"]["delivery_orders"] == 1
-    assert result["maya_time"] == "2030-03-04 09:00:00"
+    assert reset_world()["delivery_orders"] == 1
+    assert clock.state()["maya_time"] == "2030-03-04 09:00:00"
 
 
 def test_skipping_ahead_delivers_an_order_without_waiting(real):

@@ -121,14 +121,16 @@ def _init(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def reset_world() -> int:
+def reset_world(conn: sqlite3.Connection) -> int:
     """Clear all dynamic state. Reference data is untouched -- it isn't state.
+
+    Runs on ``conn`` and doesn't commit: a world reset clears every domain
+    in one transaction (see maya.reset), so no booking can land between one
+    domain's reset and the next.
 
     Returns the number of bookings cleared.
     """
-    conn = connect()
     count = conn.execute("SELECT COUNT(*) AS n FROM hotel_bookings").fetchone()["n"]
     conn.execute("DELETE FROM hotel_bookings")
     conn.execute("DELETE FROM rooms_sold")
-    conn.commit()
     return count

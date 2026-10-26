@@ -15,20 +15,28 @@ reservations take covers on top.
 The booking rules: party size from 1 to the restaurant's ``max_party``; the
 date must be a day it's open, within ``BOOKING_WINDOW_DAYS``; the time must
 be one of its half-hour slots, still in the future. Restaurants with a
-deposit take ``deposit_per_guest x party_size`` on booking; cancelling at
-least ``cancel_cutoff_hours`` ahead refunds it, later keeps it -- but still
-frees the table. Status is computed live -- CONFIRMED until the booking
-time, SEATED for the sitting, then COMPLETED. CANCELLED is the one stored
-override.
+deposit -- fine dining -- *hold* ``deposit_per_guest x party_size`` of the
+booking resident's money: still theirs, but not available to spend, until
+the sitting ends, when the hold lapses by itself (they came; nothing is
+spent). Cancelling at least ``cancel_cutoff_hours`` ahead releases the hold;
+cancelling later keeps the deposit -- the hold becomes a charge -- but
+still frees the table. Everywhere else a table costs nothing. Not enough
+available money for the hold is ``insufficient_funds``. A resident only
+sees and cancels their own reservations; anyone else's is not found.
+
+Status is computed live -- CONFIRMED until the booking time, SEATED for
+the sitting, then COMPLETED. CANCELLED is the one stored override.
 """
 
 from __future__ import annotations
 
 import json
+import sqlite3
 import random
 from datetime import date, datetime, time, timedelta
 
 from maya import storage
+from maya.simulations.residents import residents
 from maya.world import clock
 from maya.world.geography import maps
 
@@ -210,9 +218,13 @@ def _with_live_status(reservation: dict) -> dict:
     return out
 
 
-def _book(code: str, day_text: str, time_text: str, party_size: int, guest_name: str, contact_phone: str) -> dict:
-    """Reserve a table. Raises RestaurantNotFound, InvalidDate, Closed,
-    InvalidTime, InvalidPartySize, PartyTooLarge or FullyBooked."""
+def _book(
+    code: str, day_text: str, time_text: str, party_size: int, guest_name: str, contact_phone: str, resident_id: str
+) -> dict:
+    """Reserve a table for ``resident_id``, holding the deposit if there is
+    one. Raises RestaurantNotFound, InvalidDate, Closed, InvalidTime,
+    InvalidPartySize, PartyTooLarge, FullyBooked or
+    residents.InsufficientFunds."""
     restaurant = _find_restaurant(code)
     day = _bookable_day(restaurant, day_text)
     try:
@@ -240,8 +252,9 @@ def _book(code: str, day_text: str, time_text: str, party_size: int, guest_name:
         )
 
     _adjust_covers_booked(restaurant.code, slot, party_size)
+    end = slot + timedelta(minutes=restaurant.sitting_minutes)
     reservation = {
-        "reference": _next_reference(),
+        "reference": (reference := _next_reference()),
         "cancelled": False,
         "restaurant_code": restaurant.code,
         "restaurant_name": restaurant.name,
@@ -250,33 +263,50 @@ def _book(code: str, day_text: str, time_text: str, party_size: int, guest_name:
         "date": day.isoformat(),
         "time": f"{slot:%H:%M}",
         "start": f"{slot:%Y-%m-%d %H:%M}",
-        "end": f"{slot + timedelta(minutes=restaurant.sitting_minutes):%Y-%m-%d %H:%M}",
+        "end": f"{end:%Y-%m-%d %H:%M}",
         "party_size": party_size,
         "guest_name": guest_name,
         "contact_phone": contact_phone,
+        "resident_id": resident_id,
         "deposit": {"amount": restaurant.deposit_per_guest * party_size, "currency": CURRENCY},
         "cancellation_policy": restaurant.policy_text(),
         "booked_at": now.strftime("%Y-%m-%d %H:%M"),
     }
+    held = residents.hold(
+        db.connect(), resident_id, reservation["deposit"]["amount"], reference, "dining",
+        until=end.isoformat(timespec="seconds"),
+    )
     _save_reservation(reservation)
-    return _with_live_status(reservation)
+    return {**_with_live_status(reservation), "payment": residents.payment(held)}
 
 
-def book(code: str, day_text: str, time_text: str, party_size: int, guest_name: str, contact_phone: str) -> dict:
-    """Book atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction), so concurrent bookings
-    can't both take the last seats."""
+def book(
+    code: str, day_text: str, time_text: str, party_size: int, guest_name: str, contact_phone: str, resident_id: str
+) -> dict:
+    """Book atomically: every check and write below -- the hold included --
+    happens in one transaction (see maya.storage.transaction), so
+    concurrent bookings can't both take the last seats, or both set aside
+    the same money."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _book(code, day_text, time_text, party_size, guest_name, contact_phone)
+        return _book(code, day_text, time_text, party_size, guest_name, contact_phone, resident_id)
 
 
-def get(reference: str) -> dict | None:
+def _owned(reference: str, resident_id: str) -> dict | None:
+    """The reservation, if ``resident_id`` owns it. Someone else's reservation is
+    None, exactly like one that doesn't exist, so a reference never
+    confirms that another resident's reservation is there."""
     reservation = _get_reservation((reference or "").strip().upper())
+    return reservation if reservation and reservation.get("resident_id") == resident_id else None
+
+
+def get(reference: str, resident_id: str) -> dict | None:
+    reservation = _owned(reference, resident_id)
     return _with_live_status(reservation) if reservation else None
 
 
-def list_all(phone: str | None = None, status: str | None = None) -> list[dict]:
-    out = [_with_live_status(r) for r in _all_reservations()]
+def list_all(resident_id: str, phone: str | None = None, status: str | None = None) -> list[dict]:
+    out = [_with_live_status(r) for r in _all_reservations() if r.get("resident_id") == resident_id]
     if phone:
         needle = phone.strip()
         out = [r for r in out if r["contact_phone"] == needle]
@@ -286,10 +316,11 @@ def list_all(phone: str | None = None, status: str | None = None) -> list[dict]:
     return sorted(out, key=lambda r: (r["start"], r["reference"]))
 
 
-def _cancel(reference: str) -> dict:
+def _cancel(reference: str, resident_id: str) -> dict:
     """Cancel before the booking time. The table is freed either way; the
-    deposit comes back only if cancelled at least cancel_cutoff_hours ahead."""
-    reservation = _get_reservation((reference or "").strip().upper())
+    deposit's hold is released if cancelled at least cancel_cutoff_hours
+    ahead, and becomes a charge -- the deposit kept -- if later."""
+    reservation = _owned(reference, resident_id)
     if reservation is None:
         raise NotFound(f"No reservation with reference {reference!r}.")
     if reservation["cancelled"]:
@@ -302,42 +333,56 @@ def _cancel(reference: str) -> dict:
     restaurant = restaurants.get(reservation["restaurant_code"])
     cutoff = restaurant.cancel_cutoff_hours if restaurant else 0
     deposit = reservation["deposit"]["amount"]
-    refunded = deposit if hours_left >= cutoff else 0
+    # The deposit was only ever held, never charged: in time it is released,
+    # late it is kept. Nothing is refunded either way -- there is nothing to
+    # give back that was taken.
+    released = deposit if hours_left >= cutoff else 0
+    kept = deposit - released
 
     reservation["cancelled"] = True
-    reservation["refund"] = {"amount": refunded, "currency": CURRENCY}
+    reservation["refund"] = {"amount": 0, "currency": CURRENCY}
     _adjust_covers_booked(reservation["restaurant_code"], start, -reservation["party_size"])
+    # The owner's hold ends either way; a deposit kept is then charged. The
+    # release comes first, so the charge is covered by the money it freed.
+    owner, conn = reservation["resident_id"], db.connect()
+    moved = residents.release(conn, owner, reservation["reference"], "dining")
+    if kept:
+        moved = residents.charge(conn, owner, kept, reservation["reference"], "dining")
     _save_reservation(reservation)
     if not deposit:
-        reason = "Cancelled; no deposit was taken."
-    elif refunded:
-        reason = f"Cancelled at least {cutoff} hours ahead: deposit refunded."
+        reason = "Cancelled; no deposit was held."
+    elif released:
+        reason = f"Cancelled at least {cutoff} hours ahead: the deposit's hold is released; nothing was charged."
     else:
-        reason = f"Cancelled less than {cutoff} hours ahead: the deposit is kept."
+        reason = f"Cancelled less than {cutoff} hours ahead: the deposit is kept, and charged."
     return {
         "reference": reservation["reference"],
         "status": "CANCELLED",
         "refund": reservation["refund"],
-        "deposit_kept": {"amount": deposit - refunded, "currency": CURRENCY},
+        "deposit_released": {"amount": released, "currency": CURRENCY},
+        "deposit_kept": {"amount": kept, "currency": CURRENCY},
+        "payment": residents.payment(moved),
         "reason": reason,
     }
 
 
-def cancel(reference: str) -> dict:
-    """Cancel atomically: every check and write below happens in one
-    transaction (see maya.storage.transaction), so two requests can't
-    cancel the same reservation twice or free its seats twice."""
+def cancel(reference: str, resident_id: str) -> dict:
+    """Cancel atomically: every check and write below -- releasing or
+    keeping the deposit included -- happens in one transaction (see
+    maya.storage.transaction), so two requests can't cancel the same
+    reservation twice, free its seats twice or settle its deposit twice."""
+    residents.ready()
     with storage.transaction(db.connect()):
-        return _cancel(reference)
+        return _cancel(reference, resident_id)
 
 
-def reset() -> int:
+def reset(conn: sqlite3.Connection) -> int:
     """Empty all reservations and covers booked. Part of a world reset (see
     maya.reset).
 
     Returns the number of reservations cleared.
     """
-    return db.reset_world()
+    return db.reset_world(conn)
 
 
 # --- errors -------------------------------------------------------------------

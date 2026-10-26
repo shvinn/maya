@@ -5,7 +5,8 @@ services:
     image: ghcr.io/shvinn/maya:latest
     build: .
     ports:
-      # Loopback only: the MCP server has no authentication.
+      # Loopback only: resident keys travel unencrypted, and the world
+      # server (clock, reset) answers anyone who can connect.
       - "127.0.0.1:6292:6292"
     volumes:
       - maya-data:/data
