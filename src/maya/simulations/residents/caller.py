@@ -37,9 +37,24 @@ def _header(headers: Mapping[str, str], name: str) -> str | None:
     return value
 
 
+def _headers(ctx: Context | None) -> Mapping[str, str] | None:
+    """The request's HTTP headers; None on stdio or with no request at all.
+
+    A tool called in-process through the server (``server.call_tool``, as a
+    harness does) still gets a Context, but one with no request behind it,
+    whose ``headers`` raises rather than returning None -- that is a direct
+    call, not an HTTP one, so it is treated like stdio."""
+    if ctx is None:
+        return None
+    try:
+        return ctx.headers
+    except ValueError:
+        return None
+
+
 def key(ctx: Context | None) -> str | None:
     """The resident key this request carries, or None if it carries none."""
-    headers = ctx.headers if ctx is not None else None
+    headers = _headers(ctx)
     if headers is None:
         return os.environ.get(ENV_KEY, "").strip() or None
     value = (_header(headers, "authorization") or "").strip()
