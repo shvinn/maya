@@ -293,15 +293,32 @@ docker compose up                      # same as the first, from a clone
 
 Pick one of three setups. Each gives you eight servers: `flights`,
 `delivery`, `hotels`, `cars`, `events`, `dining`, `residents` and `world`.
-To book, a client also needs a resident key (see
-[Residents and money](#residents-and-money)): add
-`"env": {"MAYA_RESIDENT_KEY": "maya_rk_..."}` to a stdio entry (in Docker,
-also `"-e", "MAYA_RESIDENT_KEY"` in its `args`), or a
-`"headers": {"Authorization": "Bearer maya_rk_..."}` to an HTTP one
-(`--header` with `claude mcp add`). Give the agent
-you're testing the domain servers; keep `world` (the clock and reset
-controls) for yourself, so the agent can't skip past its own deadlines or
-wipe the world.
+Give the agent you're testing the domain servers and `residents`; keep
+`world` (the clock and reset controls) for yourself, so the agent can't
+skip past its own deadlines or wipe the world.
+
+**First, get a resident key** — without one, the agent is a guest, and a
+guest can't book (see [Residents and money](#residents-and-money)):
+
+```bash
+uv run maya residents create --first-name Lena --last-name Okafor --age 34
+# Resident key (shown once -- save it now):
+#   maya_rk_...
+```
+
+In Docker, run it against the same volume the server uses:
+`docker run --rm -v maya-data:/data ghcr.io/shvinn/maya residents create ...`.
+
+Every domain server and `residents` gets the key; `world` doesn't need one.
+Where it goes depends on the setup:
+
+| Setup | Key format |
+|---|---|
+| stdio (1, 2) | `"env": { "MAYA_RESIDENT_KEY": "maya_rk_..." }` on each server |
+| HTTP (3) | an `Authorization: Bearer maya_rk_...` header on each server |
+
+Replace `maya_rk_...` with your key. One key is one resident; to act as
+someone else, use their key.
 
 ### 1. Local, from a clone (stdio)
 
@@ -311,13 +328,13 @@ MCP clients don't start servers from inside it.
 ```json
 {
   "mcpServers": {
-    "maya-flights": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "flights"] },
-    "maya-delivery": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "delivery"] },
-    "maya-hotels": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "hotels"] },
-    "maya-cars": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "cars"] },
-    "maya-events": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "events"] },
-    "maya-dining": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "dining"] },
-    "maya-residents": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "residents"] },
+    "maya-flights": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "flights"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-delivery": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "delivery"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-hotels": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "hotels"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-cars": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "cars"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-events": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "events"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-dining": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "dining"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-residents": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "residents"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
     "maya-world": { "command": "uv", "args": ["run", "--directory", "/path/to/maya", "maya", "mcp", "world"] }
   }
 }
@@ -325,25 +342,26 @@ MCP clients don't start servers from inside it.
 
 No clone? Swap `uv run --directory /path/to/maya` for
 `uvx --from git+https://github.com/shvinn/maya`, and add
-`"env": {"MAYA_DB_PATH": "/path/to/maya.db"}` if you want the bookings
+`"MAYA_DB_PATH": "/path/to/maya.db"` to each `env` if you want the bookings
 somewhere other than your user data folder. `uvx` caches what it installs;
 add `--refresh` once to pick up a newer Maya.
 
 ### 2. Docker, no clone (stdio)
 
 Each client session starts a short-lived container; all of them share the
-`maya-data` volume, so they share one world.
+`maya-data` volume, so they share one world. `-e MAYA_RESIDENT_KEY` passes
+the key from the entry's `env` into the container.
 
 ```json
 {
   "mcpServers": {
-    "maya-flights": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "flights"] },
-    "maya-delivery": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "delivery"] },
-    "maya-hotels": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "hotels"] },
-    "maya-cars": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "cars"] },
-    "maya-events": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "events"] },
-    "maya-dining": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "dining"] },
-    "maya-residents": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "residents"] },
+    "maya-flights": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "flights"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-delivery": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "delivery"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-hotels": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "hotels"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-cars": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "cars"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-events": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "events"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-dining": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "dining"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
+    "maya-residents": { "command": "docker", "args": ["run", "-i", "--rm", "-e", "MAYA_RESIDENT_KEY", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "residents"], "env": { "MAYA_RESIDENT_KEY": "maya_rk_..." } },
     "maya-world": { "command": "docker", "args": ["run", "-i", "--rm", "-v", "maya-data:/data", "ghcr.io/shvinn/maya", "mcp", "world"] }
   }
 }
@@ -353,32 +371,43 @@ Each client session starts a short-lived container; all of them share the
 
 Start one server for every domain — `docker run -p 127.0.0.1:6292:6292 -v
 maya-data:/data ghcr.io/shvinn/maya`, `docker compose up`, or
-`uv run maya serve --domain all` — and point the client at its URLs. The
-config format varies by client; for example, Claude Code:
+`uv run maya serve --domain all` — and point the client at its URLs, sending
+the key as a header. The config format varies by client; for example,
+Claude Code, with the key in your shell first
+(`export MAYA_RESIDENT_KEY=maya_rk_...`):
 
 ```bash
-claude mcp add --transport http maya-flights http://localhost:6292/flights/mcp
-claude mcp add --transport http maya-delivery http://localhost:6292/delivery/mcp
-claude mcp add --transport http maya-hotels http://localhost:6292/hotels/mcp
-claude mcp add --transport http maya-cars http://localhost:6292/cars/mcp
-claude mcp add --transport http maya-events http://localhost:6292/events/mcp
-claude mcp add --transport http maya-dining http://localhost:6292/dining/mcp
-claude mcp add --transport http maya-residents http://localhost:6292/residents/mcp
+claude mcp add --transport http maya-flights http://localhost:6292/flights/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-delivery http://localhost:6292/delivery/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-hotels http://localhost:6292/hotels/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-cars http://localhost:6292/cars/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-events http://localhost:6292/events/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-dining http://localhost:6292/dining/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
+claude mcp add --transport http maya-residents http://localhost:6292/residents/mcp \
+  --header "Authorization: Bearer $MAYA_RESIDENT_KEY"
 claude mcp add --transport http maya-world http://localhost:6292/world/mcp
 ```
 
-or a project's `.mcp.json`:
+or a project's `.mcp.json`, which reads `${MAYA_RESIDENT_KEY}` from your
+environment when the client starts, so the file itself holds no key and is
+safe to commit:
 
 ```json
 {
   "mcpServers": {
-    "maya-flights": { "type": "http", "url": "http://localhost:6292/flights/mcp" },
-    "maya-delivery": { "type": "http", "url": "http://localhost:6292/delivery/mcp" },
-    "maya-hotels": { "type": "http", "url": "http://localhost:6292/hotels/mcp" },
-    "maya-cars": { "type": "http", "url": "http://localhost:6292/cars/mcp" },
-    "maya-events": { "type": "http", "url": "http://localhost:6292/events/mcp" },
-    "maya-dining": { "type": "http", "url": "http://localhost:6292/dining/mcp" },
-    "maya-residents": { "type": "http", "url": "http://localhost:6292/residents/mcp" },
+    "maya-flights": { "type": "http", "url": "http://localhost:6292/flights/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-delivery": { "type": "http", "url": "http://localhost:6292/delivery/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-hotels": { "type": "http", "url": "http://localhost:6292/hotels/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-cars": { "type": "http", "url": "http://localhost:6292/cars/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-events": { "type": "http", "url": "http://localhost:6292/events/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-dining": { "type": "http", "url": "http://localhost:6292/dining/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
+    "maya-residents": { "type": "http", "url": "http://localhost:6292/residents/mcp", "headers": { "Authorization": "Bearer ${MAYA_RESIDENT_KEY}" } },
     "maya-world": { "type": "http", "url": "http://localhost:6292/world/mcp" }
   }
 }
