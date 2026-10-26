@@ -213,18 +213,17 @@ its opening balance.
 
 ## World controls
 
-Whoever runs the world — you, or a test harness — controls its clock, its
-luck and resets from the `world` server (`maya mcp world`, `/world/mcp`).
-Give the agent you're testing only the domain servers: it can read the
-time, but can't skip past its own deadlines, see the seed, or wipe the
-world.
+Whoever runs the world — you, or a test harness — controls its clock and
+its luck from the `world` server (`maya mcp world`, `/world/mcp`), and
+resets it from a terminal. Give the agent you're testing only the domain
+servers: it can read the time, but can't skip past its own deadlines, see
+the seed, or wipe the world.
 
 | Tool (on the `world` server) | Effect |
 | --- | --- |
 | `world_get_time` | What time it is in Maya (also on every domain server) |
 | `world_advance_time(minutes, hours, days)` | Move ahead by a duration — forward only |
 | `world_set_time(maya_time)` | Move ahead to a moment, e.g. `2030-03-08 09:00` — forward only |
-| `world_reset(seed)` | Start over: empty every domain, go back to real time, and reseed the world's luck |
 | `world_get_seed` | This world's seed, to replay it |
 | `world_set_flight_status(flight_number, date, delay_minutes, cancelled)` | Decide one flight's fate, to stage a disruption |
 
@@ -249,16 +248,23 @@ Flights run late and get cancelled, by chance, at rates set by each airline
 the **world seed**, not the clock: the seed decides *what* happens to a
 flight, the clock only *when* it's announced. Within one world the seed is
 consistent, and every reset draws a new one, so nothing can be learned from
-a previous run. For repeatable runs, pin it: `world_reset(seed=42)`,
-`uv run maya reset --seed 42`, or `MAYA_SEED=42` in the environment. To
+a previous run. For repeatable runs, pin it: `uv run maya reset --seed 42`,
+or `MAYA_SEED=42` in the environment. To
 stage one disruption exactly, use `world_set_flight_status`.
 
 ### Reset
 
-A reset — `world_reset`, or `uv run maya reset` from a terminal — empties
-every domain's bookings, orders, rentals, tickets and reservations, drops
-flight overrides, returns the clock to real time and reseeds the world, all
-at once. Residents stay; their wallets go back to their opening balances. It's the only way time goes backwards.
+`uv run maya reset` (in Docker, `docker compose exec maya maya reset`)
+empties every domain's bookings, orders, rentals, tickets and reservations,
+drops flight overrides, returns the clock to real time and reseeds the
+world, all at once — one transaction, so nothing can happen halfway. It's
+the only way time goes backwards. Residents and their keys stay, but every
+wallet goes back to the balance it was created with: top-ups and holds go
+too.
+
+There is no reset tool: a reset wipes every resident's bookings and money,
+so it's yours to run from a terminal, never an agent's. A harness that
+imports Maya calls `maya.reset.reset_world(seed)`.
 
 ## Run with Docker
 

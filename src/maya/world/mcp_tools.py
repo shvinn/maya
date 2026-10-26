@@ -1,10 +1,15 @@
-"""MCP tools for Maya's world: its clock, its luck, and resetting it.
+"""MCP tools for Maya's world: its clock and its luck.
 
 The controls live on their own ``world`` server, meant for whoever runs the
 world (you, or a test harness) rather than the agent being tested -- so an
-agent can't skip past its own deadlines or wipe the world. Every domain server gets only the
+agent can't skip past its own deadlines. Every domain server gets only the
 read-only ``world_get_time``, via ``add_time_tool``, so an agent can always
 ask what time it is in Maya.
+
+Resetting the world is not a tool at all: it empties every resident's
+bookings and wallet, and needs no key, so anything connected could wipe
+everyone. It is ``maya reset`` from a terminal, or ``maya.reset.reset_world``
+for a harness that imports Maya.
 """
 
 from __future__ import annotations
@@ -13,7 +18,6 @@ from mcp.server.mcpserver import MCPServer
 
 from datetime import date as Date, timedelta
 
-from maya.reset import reset_world
 from maya.simulations.flights import operations, schedule
 from maya.tool_errors import tool_error
 
@@ -71,23 +75,6 @@ def world_advance_time(minutes: float = 0, hours: float = 0, days: float = 0) ->
         return clock.advance(minutes, hours, days)
     except clock.ClockError as e:
         return _error(e)
-
-
-@mcp.tool()
-def world_reset(seed: int | None = None) -> dict:
-    """Start the world over: empty every domain's bookings, orders, rentals,
-    tickets and reservations, return Maya time to real time, and reseed the
-    world's luck (which flights are delayed or cancelled).
-
-    The only way time goes backwards -- bookings and the clock reset
-    together, so nothing is left dated in a future that hasn't happened.
-    Pass ``seed`` to replay a world exactly; leave it out for a new one
-    (MAYA_SEED, if set, else random). Reference data (airports, hotels,
-    menus, shows) is untouched. Returns how many records each domain had
-    and the new seed.
-    """
-    cleared = reset_world(seed)
-    return {"cleared": cleared, "seed": world_seed.get(), **clock.state()}
 
 
 @mcp.tool()

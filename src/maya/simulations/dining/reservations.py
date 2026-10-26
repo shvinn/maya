@@ -22,14 +22,16 @@ spent). Cancelling at least ``cancel_cutoff_hours`` ahead releases the hold;
 cancelling later keeps the deposit -- the hold becomes a charge -- but
 still frees the table. Everywhere else a table costs nothing. Not enough
 available money for the hold is ``insufficient_funds``. A resident only
-sees and cancels their own reservations; anyone else's is not found. Status is computed live -- CONFIRMED until the booking
-time, SEATED for the sitting, then COMPLETED. CANCELLED is the one stored
-override.
+sees and cancels their own reservations; anyone else's is not found.
+
+Status is computed live -- CONFIRMED until the booking time, SEATED for
+the sitting, then COMPLETED. CANCELLED is the one stored override.
 """
 
 from __future__ import annotations
 
 import json
+import sqlite3
 import random
 from datetime import date, datetime, time, timedelta
 
@@ -331,29 +333,34 @@ def _cancel(reference: str, resident_id: str) -> dict:
     restaurant = restaurants.get(reservation["restaurant_code"])
     cutoff = restaurant.cancel_cutoff_hours if restaurant else 0
     deposit = reservation["deposit"]["amount"]
-    refunded = deposit if hours_left >= cutoff else 0
+    # The deposit was only ever held, never charged: in time it is released,
+    # late it is kept. Nothing is refunded either way -- there is nothing to
+    # give back that was taken.
+    released = deposit if hours_left >= cutoff else 0
+    kept = deposit - released
 
     reservation["cancelled"] = True
-    reservation["refund"] = {"amount": refunded, "currency": CURRENCY}
+    reservation["refund"] = {"amount": 0, "currency": CURRENCY}
     _adjust_covers_booked(reservation["restaurant_code"], start, -reservation["party_size"])
     # The owner's hold ends either way; a deposit kept is then charged. The
     # release comes first, so the charge is covered by the money it freed.
     owner, conn = reservation["resident_id"], db.connect()
     moved = residents.release(conn, owner, reservation["reference"], "dining")
-    if deposit - refunded:
-        moved = residents.charge(conn, owner, deposit - refunded, reservation["reference"], "dining")
+    if kept:
+        moved = residents.charge(conn, owner, kept, reservation["reference"], "dining")
     _save_reservation(reservation)
     if not deposit:
-        reason = "Cancelled; no deposit was taken."
-    elif refunded:
-        reason = f"Cancelled at least {cutoff} hours ahead: deposit refunded."
+        reason = "Cancelled; no deposit was held."
+    elif released:
+        reason = f"Cancelled at least {cutoff} hours ahead: the deposit's hold is released; nothing was charged."
     else:
-        reason = f"Cancelled less than {cutoff} hours ahead: the deposit is kept."
+        reason = f"Cancelled less than {cutoff} hours ahead: the deposit is kept, and charged."
     return {
         "reference": reservation["reference"],
         "status": "CANCELLED",
         "refund": reservation["refund"],
-        "deposit_kept": {"amount": deposit - refunded, "currency": CURRENCY},
+        "deposit_released": {"amount": released, "currency": CURRENCY},
+        "deposit_kept": {"amount": kept, "currency": CURRENCY},
         "payment": residents.payment(moved),
         "reason": reason,
     }
@@ -369,13 +376,13 @@ def cancel(reference: str, resident_id: str) -> dict:
         return _cancel(reference, resident_id)
 
 
-def reset() -> int:
+def reset(conn: sqlite3.Connection) -> int:
     """Empty all reservations and covers booked. Part of a world reset (see
     maya.reset).
 
     Returns the number of reservations cleared.
     """
-    return db.reset_world()
+    return db.reset_world(conn)
 
 
 # --- errors -------------------------------------------------------------------

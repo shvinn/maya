@@ -458,21 +458,29 @@ def payment(result: dict) -> dict:
     }
 
 
-def reset() -> int:
+def reset(conn: sqlite3.Connection) -> int:
     """Empty every wallet back to its opening balance. Part of a world reset
-    (see maya.reset); residents and their keys are kept.
+    (see maya.reset), on its ``conn`` and inside its one transaction, so no
+    booking's charge can be wiped while the booking survives; residents and
+    their keys are kept.
 
-    Every transaction goes except each wallet's ``opening_balance``, which
-    is re-stamped with the reset's "now": the world's history starts over,
-    and an opening balance dated in a future the clock just left would be
-    a transaction from a time that hasn't happened.
+    Every transaction goes except each wallet's ``opening_balance`` --
+    top-ups and holds included: a reset is the admin starting the world
+    over, from the money each resident was created with.
 
     Returns the number of transactions cleared.
     """
+    return conn.execute("DELETE FROM transactions WHERE kind != 'opening_balance'").rowcount
+
+
+def restamp_opening_balances() -> None:
+    """Date every opening balance at the world's new "now", once a reset
+    has committed: its history starts over, and an opening balance dated in
+    a future the clock just left would be a transaction from a time that
+    hasn't happened. Separate from reset() because "now" is only the new
+    one once the reset's clock change is committed."""
     with storage.transaction(db.connect()) as conn:
-        cleared = conn.execute("DELETE FROM transactions WHERE kind != 'opening_balance'").rowcount
         conn.execute("UPDATE transactions SET maya_time = ? WHERE kind = 'opening_balance'", (_now(),))
-    return cleared
 
 
 class ResidentError(Exception):

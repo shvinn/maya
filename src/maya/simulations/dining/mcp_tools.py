@@ -138,9 +138,10 @@ def dining_cancel_reservation(reference: str, ctx: Context | None = None) -> dic
     """Cancel a reservation any time before the booking time; the table goes
     back on offer.
 
-    A deposit's hold is released only if cancelled at least the
-    restaurant's cancellation cutoff ahead -- later than that the deposit
-    is kept, charged to your wallet (see ``deposit_kept``), but the
+    A deposit is only ever held, so nothing is refunded (``refund`` is
+    always 0): cancelled at least the restaurant's cancellation cutoff
+    ahead, the hold is released (``deposit_released``); later than that the
+    deposit is kept, charged to your wallet (``deposit_kept``), but the
     cancellation still goes through.
     """
     try:

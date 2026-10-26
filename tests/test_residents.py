@@ -213,6 +213,15 @@ def test_a_transaction_of_an_unknown_kind_is_a_bug():
 # --- world reset --------------------------------------------------------------
 
 
+def test_a_reset_returns_each_wallet_to_its_opening_balance_top_ups_and_all():
+    """A reset is the admin starting the world over from the money each
+    resident was created with: top-ups go too."""
+    r = lena(opening_balance=100)
+    residents.add_funds(r["resident_id"], 900)
+    reset_world()
+    assert residents.balance(r["resident_id"]) == 100
+
+
 def test_reset_keeps_residents_and_keys_but_refills_wallets():
     r = lena(opening_balance=1000)
     residents.add_funds(r["resident_id"], 500)

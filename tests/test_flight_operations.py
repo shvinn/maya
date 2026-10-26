@@ -13,6 +13,7 @@ import asyncio
 from datetime import date, timedelta
 
 from maya.mcp_tools import SERVERS
+from maya.reset import reset_world
 from maya.simulations.flights import connections, operations, schedule
 from maya.simulations.flights import mcp_tools as t
 from maya.simulations.flights.schedule import ScheduledFlight
@@ -166,16 +167,16 @@ def fates(days: int = 14) -> list:
 
 
 def test_a_seed_replays_a_world_and_a_new_seed_brings_new_luck():
-    world.world_reset(seed=1)
+    reset_world(seed=1)
     first = fates()
-    world.world_reset(seed=2)
+    reset_world(seed=2)
     assert fates() != first
-    world.world_reset(seed=1)
+    reset_world(seed=1)
     assert fates() == first
 
 
 def test_a_reset_without_a_seed_uses_maya_seed():
-    assert world.world_reset()["seed"] == 20300304
+    reset_world()
     assert world.world_get_seed() == {"seed": 20300304}
 
 
@@ -199,7 +200,7 @@ def test_an_override_can_delay_a_flight_and_a_reset_drops_it(clock):
     world.world_set_flight_status(flight.flight_number, flight.date.isoformat(), delay_minutes=300)
     clock.set(flight.departure - timedelta(hours=1))
     assert (status(flight)["flight_status"], status(flight)["delay_minutes"]) == ("DELAYED", 300)
-    world.world_reset()
+    reset_world()
     clock.set(flight.departure - timedelta(hours=1))
     assert status(flight)["flight_status"] == "SCHEDULED"
 

@@ -104,15 +104,18 @@ def test_no_deposit_means_free_cancellation_until_the_booking_time(clock):
     assert t.dining_cancel_reservation(made["reference"])["status"] == "CANCELLED"
 
 
-def test_a_deposit_comes_back_only_if_cancelled_early_enough(clock):
+def test_a_deposit_is_released_only_if_cancelled_early_enough(clock):
     early = book("LPK", WED_NEXT, "19:00")
     assert early["deposit"]["amount"] == 50  # 25 a guest
-    assert t.dining_cancel_reservation(early["reference"])["refund"]["amount"] == 50
+    released = t.dining_cancel_reservation(early["reference"])
+    assert released["deposit_released"]["amount"] == 50
+    assert released["refund"]["amount"] == 0  # it was held, never charged
 
     late = book("LPK", WED_NEXT, "19:00")
     clock.set(clock.now.replace(day=13, hour=12))  # 7 hours ahead; the cutoff is 24
     cancelled = t.dining_cancel_reservation(late["reference"])
     assert cancelled["refund"]["amount"] == 0
+    assert cancelled["deposit_released"]["amount"] == 0
     assert cancelled["deposit_kept"]["amount"] == 50
     assert error_code(t.dining_cancel_reservation(late["reference"])) == "already_cancelled"
 

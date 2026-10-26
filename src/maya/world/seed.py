@@ -7,7 +7,7 @@ a reset picks a new seed, so the next world's luck is new and nothing can be
 learned from a previous run.
 
 Pin it for repeatable runs: ``MAYA_SEED`` in the environment, or a seed
-passed to the reset (``world_reset(seed=...)``, ``maya reset --seed``). The
+passed to the reset (``maya reset --seed``, ``reset_world(seed=...)``). The
 seed is for whoever runs the world, never the agent under test -- with it,
 every future delay could be worked out -- so only the ``world`` server
 shows it.
@@ -61,13 +61,12 @@ def get() -> int:
     return _connect().execute("SELECT seed FROM world_seed WHERE id = 1").fetchone()["seed"]
 
 
-def _reset(seed: int | None = None) -> int:
+def _reset(conn: sqlite3.Connection, seed: int | None = None) -> int:
     """A new seed for a new world -- ``seed`` if given, else MAYA_SEED, else
-    random. Only ``maya.reset.reset_world`` calls this."""
+    random. Only ``maya.reset.reset_world`` calls this, on its ``conn`` and
+    inside its one transaction (so this doesn't commit)."""
     new = _fresh() if seed is None else seed
-    conn = _connect()
-    with conn:
-        conn.execute("INSERT OR REPLACE INTO world_seed (id, seed) VALUES (1, ?)", (new,))
+    conn.execute("INSERT OR REPLACE INTO world_seed (id, seed) VALUES (1, ?)", (new,))
     return new
 
 

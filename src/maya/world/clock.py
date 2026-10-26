@@ -148,14 +148,13 @@ def set_time(maya_time: str) -> dict:
     return state()
 
 
-def _reset() -> None:
+def _reset(conn: sqlite3.Connection) -> None:
     """Back to real time in MYT -- the one way time goes backwards. Only
     ``maya.reset.reset_world`` calls this, together with emptying every
-    domain's bookings."""
-    conn = _connect()
+    domain's bookings, on its ``conn`` and inside its one transaction (so
+    this doesn't commit)."""
     _ensure_table(conn)
-    with conn:
-        conn.execute("DELETE FROM world_clock")
+    conn.execute("DELETE FROM world_clock")
 
 
 class ClockError(Exception):

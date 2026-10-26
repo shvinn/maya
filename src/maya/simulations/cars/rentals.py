@@ -36,6 +36,7 @@ pay-at-the-counter rentals work.
 from __future__ import annotations
 
 import json
+import sqlite3
 import math
 import random
 from datetime import date, datetime, time, timedelta
@@ -374,13 +375,12 @@ def cancel(reference: str, resident_id: str) -> dict:
         return _cancel(reference, resident_id)
 
 
-def reset() -> int:
+def reset(conn: sqlite3.Connection) -> int:
     """Empty all rentals and cars out. Part of a world reset (see maya.reset).
 
     Returns the number of rentals cleared.
     """
-    cleared = db.reset_world()
-    return cleared
+    return db.reset_world(conn)
 
 
 class RentalError(Exception):

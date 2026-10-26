@@ -264,3 +264,70 @@ def test_a_tool_called_through_the_server_in_process_finds_its_resident(monkeypa
     result = asyncio.run(SERVERS[domain].call_tool(tool, args))
     assert not result.is_error
     assert residents.balance(r["resident_id"]) < 100_000
+
+
+# --- edges the review found untested ------------------------------------------
+
+
+def test_a_late_cancel_is_covered_even_with_nothing_else_available(monkeypatch, clock):
+    """All the money is held, so none is available -- yet keeping the
+    deposit works: the hold is released first, and the charge spends what
+    that frees."""
+    r = new_resident(monkeypatch, opening_balance=50)
+    made = lpk()
+    assert residents.available(r["resident_id"]) == 0
+    clock.set(datetime(2030, 3, 13, 12, 0))
+    cancelled = dining.dining_cancel_reservation(made["reference"])
+    assert error_code(cancelled) is None
+    assert cancelled["deposit_kept"]["amount"] == 50
+    assert residents.wallet(r["resident_id"])["balance"]["amount"] == 0
+    assert residents.held(r["resident_id"]) == 0
+
+
+def test_a_hold_and_a_charge_racing_for_the_same_money_cannot_both_win(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    stay = DOMAINS["hotels"][0]
+    new_resident(monkeypatch)
+    price = stay()["total_price"]["amount"]  # what the same stay costs
+
+    r = new_resident(monkeypatch, opening_balance=price + 49)  # the stay, or the 50 hold -- not both
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda book: book(), [stay, lpk]))
+    won = [x for x in results if error_code(x) is None]
+    assert len(won) == 1
+    assert residents.available(r["resident_id"]) >= 0
+
+
+def test_a_booking_that_arrives_during_a_reset_is_paid_for(monkeypatch):
+    """The reset is one transaction. A booking arriving mid-reset waits for
+    it and lands after, charge and all -- it can't slip between the domains
+    being emptied and the wallets, keeping its order and losing its charge."""
+    import threading
+
+    from maya.reset import reset_world
+    from maya.world import clock as world_clock
+
+    r = new_resident(monkeypatch, opening_balance=1000)
+    placed = {}
+    real_reset = world_clock._reset
+
+    def reset_then_order(conn):
+        real_reset(conn)  # the domains are emptied by now; the wallets are next
+        worker = threading.Thread(target=lambda: placed.update(order=DOMAINS["delivery"][0]()))
+        worker.start()
+        worker.join(timeout=0.3)  # it can't get in: the reset holds the database
+        placed["waited"] = worker.is_alive()
+        placed["worker"] = worker
+
+    monkeypatch.setattr(world_clock, "_reset", reset_then_order)
+    reset_world()
+    placed["worker"].join(timeout=10)
+
+    assert placed["waited"]
+    order = placed["order"]
+    assert error_code(order) is None
+    assert delivery.delivery_get_order(order["reference"])["reference"] == order["reference"]
+    assert residents.balance(r["resident_id"]) == 1000 - order["total_price"]["amount"]
+    delivery.delivery_cancel_order(order["reference"])
+    assert residents.balance(r["resident_id"]) == 1000  # not 1000 + the refund

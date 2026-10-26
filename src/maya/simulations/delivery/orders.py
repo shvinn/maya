@@ -35,6 +35,7 @@ list rather than a timing accident.
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import datetime, timedelta
 
 from maya import storage
@@ -276,13 +277,12 @@ def cancel(order_id: str, resident_id: str) -> dict:
         return _cancel(order_id, resident_id)
 
 
-def reset() -> int:
+def reset(conn: sqlite3.Connection) -> int:
     """Empty all orders. Part of a world reset (see maya.reset).
 
     Returns the number of orders cleared.
     """
-    cleared = db.reset_world()
-    return cleared
+    return db.reset_world(conn)
 
 
 class OrderError(Exception):
